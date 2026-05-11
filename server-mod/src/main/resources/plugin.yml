@@ -1,0 +1,32 @@
+name: RevivalPVPServerMod
+version: '1.7.0'
+main: net.revivalsmp.pvp.servermod.RevivalPVPServerMod
+api-version: '1.21'
+description: Server-side counterpart to revival-pvp-mod. Adds /pvp on any Paper server and routes players to RevivalPVP matchmaking. Licensed product — requires a tenant key.
+authors: [RevivalSMP]
+website: https://revivalpvp.net
+
+commands:
+  pvp:
+    description: Open the RevivalPVP queue GUI
+    usage: /pvp
+    aliases: [duels, rpvp]
+    permission: revival.pvp.servermod.use
+    permission-message: §cYou don't have permission to use /pvp.
+  pvpaccept:
+    description: Accept a pending RevivalPVP match (also fired by the chat [ACCEPT] click)
+    usage: /pvpaccept
+    permission: revival.pvp.servermod.use
+    permission-message: §cYou don't have permission to use /pvpaccept.
+  pvpadmin:
+    description: RevivalPVPServerMod admin commands
+    usage: /pvpadmin <setup|status|reload|key>
+    permission: revival.pvp.servermod.admin
+
+permissions:
+  revival.pvp.servermod.admin:
+    description: Admin access to RevivalPVPServerMod
+    default: op
+  revival.pvp.servermod.use:
+    description: Allow players to queue for RevivalPVP duels via /pvp
+    default: true

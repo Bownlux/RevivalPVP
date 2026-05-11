@@ -1,0 +1,37 @@
+# RevivalPVPServerMod config
+#
+# tenant-key:    Your API key from revivalpvp.net. Required.
+#                Get one by emailing the address on the website, or contact
+#                @bownux on Discord. Without a valid key, /pvp will refuse
+#                to queue (the plugin still loads cleanly).
+#
+# backend-url:   Public RevivalPVP API base URL. Override only for testing.
+#
+# origin-server: How this server is reachable from the public internet so
+#                players can be transferred BACK after a duel ends. Format
+#                "host:port" or just "host" (defaults to 25565). Examples:
+#                  origin-server: "myserver.example.com"
+#                  origin-server: "play.myserver.com:25577"
+#                If you run behind a Velocity/BungeeCord proxy, use the
+#                proxy's public hostname:port, NOT the backend MC port.
+#
+# default-scope: Default match scope shown in the GUI for new players.
+#                  local  — only match against players on THIS server
+#                  region — match within your geographic region (NA/EU/etc)
+#                  global — match against anyone (fastest queues)
+#
+# gui-item:      Optional. Material name to give players on join that opens
+#                /pvp when right-clicked. Set to "" to disable.
+#
+# plugin-api-key: Shared secret required by the backend's plugin-key-auth
+#                 endpoints (e.g. /kits/loadouts/.../by-uuid/...). Server
+#                 owners get this from RevivalPVP support along with the
+#                 tenant-key. Without it, the loadout editor will fail
+#                 to load and show a friendly error.
+
+tenant-key: ""
+backend-url: "https://api.revivalpvp.net"
+origin-server: ""
+default-scope: "global"
+gui-item: ""
+plugin-api-key: "changeme"

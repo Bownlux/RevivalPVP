@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>net.revivalsmp</groupId>
+    <artifactId>revival-pvp-server-mod</artifactId>
+    <version>1.7.0</version>
+    <packaging>jar</packaging>
+    <name>RevivalPVPServerMod</name>
+    <description>Server-side counterpart to revival-pvp-mod. Adds /pvp on any Paper server.</description>
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>papermc</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+        <repository>
+            <id>jitpack</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!-- Paper 1.20.5+ for Player.transfer(host, port); using current 26.1.x -->
+        <dependency>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>26.1.2.build.60-stable</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- WebSocket client (Tyrus standalone, shaded into our package) -->
+        <dependency>
+            <groupId>org.glassfish.tyrus.bundles</groupId>
+            <artifactId>tyrus-standalone-client</artifactId>
+            <version>2.1.5</version>
+        </dependency>
+        <!-- Gson is bundled with Paper at runtime -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>RevivalPVPServerMod-${project.version}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.2</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                        <version>9.8</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm-commons</artifactId>
+                        <version>9.8</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <minimizeJar>false</minimizeJar>
+                    <createDependencyReducedPom>false</createDependencyReducedPom>
+                    <transformers>
+                        <!-- Critical for jakarta.websocket: rewrites META-INF/services/
+                             entries so the ServiceLoader resolves the relocated
+                             org.glassfish.tyrus.client.ClientManager. Without this,
+                             ContainerProvider.getWebSocketContainer() throws
+                             "Could not find an implementation class". -->
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                    </transformers>
+                    <relocations>
+                        <relocation>
+                            <pattern>org.glassfish.tyrus</pattern>
+                            <shadedPattern>net.revivalsmp.pvp.servermod.lib.tyrus</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>jakarta.websocket</pattern>
+                            <shadedPattern>net.revivalsmp.pvp.servermod.lib.jakarta.websocket</shadedPattern>
+                        </relocation>
+                    </relocations>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,8 @@
+{
+  "key.revival-pvp.open_hub": "Open RevivalPVP Hub",
+  "key.categories.revival-pvp": "RevivalPVP",
+  "revival-pvp.button.open_hub": "RevivalPVP",
+  "revival-pvp.button.tooltip": "Open the RevivalPVP queue + login menu",
+  "revival-pvp.title.not_connected": "RevivalPVP",
+  "revival-pvp.title.not_connected.detail": "Join a Minecraft server running RevivalPVP to queue for duels."
+}

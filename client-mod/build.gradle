@@ -1,0 +1,68 @@
+buildscript {
+    repositories {
+        maven { url = "https://maven.fabricmc.net/" }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "net.fabricmc:fabric-loom:${project.property('loom_version')}"
+    }
+}
+
+apply plugin: "net.fabricmc.fabric-loom"
+apply plugin: "maven-publish"
+
+version = "${project.mod_version}-${project.minecraft_version}"
+group = project.maven_group
+
+base { archivesName = project.archives_base_name }
+
+repositories {
+    mavenCentral()
+    maven { url = "https://maven.terraformersmc.com/releases/" }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    include "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    // WebSocket client (Tyrus standalone, shaded)
+    implementation "org.glassfish.tyrus.bundles:tyrus-standalone-client:2.1.5"
+    include "org.glassfish.tyrus.bundles:tyrus-standalone-client:2.1.5"
+
+    // JSON (Gson already in MC classpath, use that)
+    // OpenSkill math done server-side; client just displays results
+}
+
+loom {
+    runs {
+        client {
+            client()
+            setConfigName("Fabric Client")
+            ideConfigGenerated(true)
+            runDir("run")
+        }
+    }
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "release_name", project.release_name
+    filesMatching("fabric.mod.json") {
+        expand "version":      project.version,
+               "mod_mc_dep":   project.mod_mc_dep,
+               "mod_java_dep": project.mod_java_dep,
+               "release_name": project.release_name
+    }
+}
+
+def javaVer = Integer.parseInt(project.java_version)
+tasks.withType(JavaCompile).configureEach { it.options.release = javaVer }
+java {
+    withSourcesJar()
+    def jv = JavaVersion.toVersion(javaVer)
+    sourceCompatibility = jv
+    targetCompatibility = jv
+}

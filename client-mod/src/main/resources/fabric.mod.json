@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "revival-pvp",
+  "version": "${version}",
+  "name": "RevivalPVP",
+  "description": "Cross-server ranked PvP duels. Queue from any server or single-player, transfer to a low-latency arena, climb a per-kit ladder. Part of the RevivalPVP ecosystem.",
+  "authors": ["RevivalSMP"],
+  "contact": {
+    "homepage": "https://revivalpvp.net",
+    "sources":  "https://github.com/bownlux/revivalpvpmod",
+    "issues":   "https://github.com/bownlux/revivalpvpmod/issues"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "icon": "assets/revival-pvp/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main":   ["net.revivalsmp.pvp.RevivalPVPMod"],
+    "client": ["net.revivalsmp.pvp.client.RevivalPVPClient"]
+  },
+  "mixins": [
+    "revival-pvp.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft":    "${mod_mc_dep}",
+    "java":         "${mod_java_dep}",
+    "fabric-api":   "*"
+  },
+  "custom": {
+    "revival-pvp:release_name": "${release_name}"
+  }
+}

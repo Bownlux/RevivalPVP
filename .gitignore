@@ -1,0 +1,44 @@
+# Java build outputs
+**/build/
+**/target/
+**/bin/
+**/out/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Gradle
+**/.gradle/
+**/gradle-app.setting
+
+# Maven
+**/dependency-reduced-pom.xml
+**/.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ / Eclipse / VS Code
+**/.idea/
+**/.vscode/
+**/*.iml
+**/*.ipr
+**/*.iws
+**/.classpath
+**/.project
+**/.settings/
+**/bin/
+
+# Minecraft / Fabric run dirs
+**/run/
+**/runs/
+**/.fabric/
+**/loom-cache/
+
+# Logs and tmp
+*.log
+*.tmp
+*.bak
+**/.DS_Store
+
+# Local config not for distribution
+**/local.properties
+.env
+.env.local
