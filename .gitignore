@@ -5,7 +5,10 @@
 **/out/
 *.class
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
+# The gradle-wrapper.jar lives at client-mod/gradle/wrapper/ — needs the
+# `**/` prefix because the unignore rule is matched against the full path
+# from .gitignore's location, not relative to each directory.
+!**/gradle/wrapper/gradle-wrapper.jar
 
 # Gradle
 **/.gradle/
