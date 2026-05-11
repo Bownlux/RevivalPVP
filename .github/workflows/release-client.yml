@@ -18,7 +18,9 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          # Matches gradle.properties java_version=25 / mod_java_dep=>=25
+          # on the main branch.
+          java-version: '25'
           cache: gradle
       - name: Make gradlew executable
         working-directory: client-mod
