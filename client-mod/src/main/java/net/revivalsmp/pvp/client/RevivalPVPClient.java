@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-NC-1.0.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Shield-1.0.0
 // Copyright (c) 2026 RevivalSMP. See LICENSE.md and NOTICE.md.
 
 package net.revivalsmp.pvp.client;

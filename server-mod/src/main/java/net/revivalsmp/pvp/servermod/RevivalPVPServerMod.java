@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-PolyForm-NC-1.0.0
+// SPDX-License-Identifier: LicenseRef-PolyForm-Shield-1.0.0
 // Copyright (c) 2026 RevivalSMP. See LICENSE.md and NOTICE.md.
 
 package net.revivalsmp.pvp.servermod;
@@ -157,9 +157,11 @@ public class RevivalPVPServerMod extends JavaPlugin {
             w.println("  Email:   support@revivalsmp.net");
             w.println();
             w.println("------------------------------------------------------------");
-            w.println("RevivalPVP is distributed under PolyForm Noncommercial 1.0.0.");
-            w.println("Commercial use (paid ranks, hosting services, paid modpacks)");
-            w.println("requires a separate agreement — ask on Discord.");
+            w.println("RevivalPVP is distributed under PolyForm Shield 1.0.0.");
+            w.println("Permissive for almost all uses, including paid Minecraft");
+            w.println("servers. The license restricts competing uses (running a");
+            w.println("rival cross-server PVP matchmaking service). See LICENSE.md");
+            w.println("and NOTICE.md at github.com/Bownlux/RevivalPVP for details.");
         } catch (java.io.IOException e) {
             getLogger().warning("Could not write WELCOME-READ-ME-FIRST.txt: " + e.getMessage());
         }

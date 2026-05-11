@@ -1,5 +1,5 @@
 name: RevivalPVPServerMod
-version: '1.7.0'
+version: '1.7.1'
 main: net.revivalsmp.pvp.servermod.RevivalPVPServerMod
 api-version: '1.21'
 description: Server-side counterpart to revival-pvp-mod. Adds /pvp on any Paper server and routes players to RevivalPVP matchmaking. Licensed product — requires a tenant key.

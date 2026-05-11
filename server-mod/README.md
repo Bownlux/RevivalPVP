@@ -75,6 +75,9 @@ Requires Java 25 + Maven 3.9+.
 
 ## License
 
-PolyForm Noncommercial 1.0.0 — see [../LICENSE.md](../LICENSE.md) and
-[../NOTICE.md](../NOTICE.md). Free for noncommercial server use.
-Paid-server use needs a separate agreement; ping us on Discord.
+PolyForm Shield 1.0.0 — see [../LICENSE.md](../LICENSE.md) and
+[../NOTICE.md](../NOTICE.md). Permissive for paid Minecraft server
+operators (you're a *customer* of the RevivalPVP service, not a
+competitor). The license restricts **Competing Uses** — running a
+rival cross-server PVP matchmaking service. See NOTICE.md for the
+plain-language rundown.

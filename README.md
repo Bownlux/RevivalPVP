@@ -42,11 +42,13 @@ Full operator guide: [docs/operator-guide.md](docs/operator-guide.md).
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE.md) — free for personal,
-hobbyist, educational, and noncommercial server use. Commercial use
-(paid ranks, paid hosting service, paid modpack bundling, etc.)
-requires a separate written agreement. See [NOTICE.md](NOTICE.md)
-for the full rundown.
+[PolyForm Shield 1.0.0](LICENSE.md) — permissive for almost all uses
+including paid Minecraft servers, paid modpack bundling, and personal
+modification. The one thing the license restricts is **Competing
+Uses** — running a rival cross-server PVP matchmaking service that
+replicates what we operate. See [NOTICE.md](NOTICE.md) for the plain-
+language rundown of what's permitted vs what needs a separate
+agreement.
 
 ## Contributing
 

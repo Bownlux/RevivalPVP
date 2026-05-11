@@ -36,6 +36,11 @@ You'll be prompted to authenticate via your Mojang session on first open. No pas
 
 ## License
 
-PolyForm Noncommercial 1.0.0. See [LICENSE](./LICENSE).
+PolyForm Shield 1.0.0. See [../LICENSE.md](../LICENSE.md) and
+[../NOTICE.md](../NOTICE.md).
 
-You can read, modify, share patches, and use the mod for personal, educational, or charitable use. Commercial use, including running the mod against a competing or commercial backend, is not permitted without a separate license.
+Permissive for most uses — including bundling in paid modpacks and
+playing on paid Minecraft servers. The license restricts **Competing
+Uses** (e.g. running a rival cross-server PVP matchmaking service
+built on a fork of these mods). See NOTICE.md for the plain-language
+rundown.

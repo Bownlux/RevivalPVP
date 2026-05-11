@@ -1,42 +1,53 @@
-# RevivalPVP — Noncommercial Use Notice
+# RevivalPVP — Use Notice
 
-RevivalPVP is distributed under the **PolyForm Noncommercial 1.0.0** license
-(see [LICENSE.md](LICENSE.md)). This NOTICE clarifies what "noncommercial"
-means in the context of running a Minecraft server with this software.
+RevivalPVP is distributed under **PolyForm Shield 1.0.0**
+(see [LICENSE.md](LICENSE.md)). This NOTICE clarifies what Shield
+means in plain language for the most common ways people use this
+software.
+
+The Shield license is more permissive than a typical "noncommercial"
+license. The bar is **competing with the licensor**, not "commercial
+use" in general.
 
 ## What you can do (no permission needed)
 
-- Run the client mod on your personal Minecraft client.
-- Run the server mod on a Minecraft server that you operate as a hobby —
-  no paid ranks, no paid kits, no paid cosmetics, no paid world access,
-  no advertising revenue tied to the server.
-- Modify either mod for personal use.
-- Redistribute either mod under the same PolyForm Noncommercial license.
-- Use either mod for education, research, demonstrations, or learning.
+- **Run the server mod on any Minecraft server**, including ones that
+  charge players for ranks, cosmetics, world access, queue priority,
+  donations, or any other in-game monetization. You're a *user* of
+  the RevivalPVP service, not a competitor to it.
+- **Run the client mod** on your personal client or modpack.
+- **Modify either mod** for your own use, your own server, or your
+  own community.
+- **Redistribute** either mod (modified or unmodified) under the same
+  PolyForm Shield license.
+- **Bundle in a modpack** (free or paid). The modpack itself isn't
+  competing with our matchmaking service.
+- **Use for research, education, demonstrations, hobby projects.**
 
-## What requires a separate agreement
+## What requires a separate written agreement
 
-If you want to use RevivalPVP in any of these ways, please reach out
-first — we're happy to talk:
+The license prohibits **Competing Uses** — using this software to
+provide a product or service that competes with what RevivalSMP
+offers. Concretely, that means:
 
-- Running the server mod on a server that charges players money for
-  anything (ranks, perks, in-game items, world access, queue priority,
-  cosmetics, etc.).
-- Hosting RevivalPVP as part of a paid Minecraft hosting service or
-  managed-server SaaS.
-- Bundling RevivalPVP into a paid modpack or commercial distribution.
-- Sub-licensing RevivalPVP to third parties.
-- Using the RevivalPVP name, logo, or "RevivalPVP" brand for a service
-  that competes with the official one at revivalpvp.net.
+- **Running a competing cross-server PVP matchmaking service** that
+  rival server operators connect their Minecraft servers to. This is
+  the core product we sell tenant subscriptions for.
+- **Hosting RevivalPVP as a paid managed service** (e.g. "I'll host
+  your tenant for you" SaaS).
+- **Selling subscriptions to a RevivalPVP-like network** built on
+  forks of these mods plus your own backend.
+
+The simple test: is what you're doing **using** RevivalPVP, or
+**replicating** it? Using is fine, replicating is not.
+
+If you're not sure whether your use case crosses the line, ask first.
+We'd rather have the conversation than have you guess wrong.
 
 ## How to ask
 
 - **Discord**: <https://discord.gg/revival-smp> (open a ticket)
 - **Email**: <support@revivalsmp.net>
-
-Tell us what you want to do and we'll respond with terms. We aim to be
-generous with small projects and clear about the few cases where a
-commercial license is required.
 
 ## Tenant model
 
@@ -46,8 +57,8 @@ need a free tenant key from <https://play.revivalsmp.net/pvp/host>.
 
 You may technically point the server mod at a different backend by
 editing `config.yml`, but the protocol is not stable, undocumented, and
-the backend is **not** open-source. Forking the entire stack is not
-supported.
+the backend is closed-source. Hosting a parallel matchmaking service
+would be a Competing Use under the license terms above.
 
 ---
 

@@ -6,7 +6,7 @@
 
     <groupId>net.revivalsmp</groupId>
     <artifactId>revival-pvp-server-mod</artifactId>
-    <version>1.7.0</version>
+    <version>1.7.1</version>
     <packaging>jar</packaging>
     <name>RevivalPVPServerMod</name>
     <description>Server-side counterpart to revival-pvp-mod. Adds /pvp on any Paper server.</description>
