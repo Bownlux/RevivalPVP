@@ -61,14 +61,37 @@ public class DuelServerConnector {
 
         RevivalPVPMod.LOGGER.info("Connecting to duel server: {}", address);
 
-        ConnectScreen.startConnecting(
-            mc.screen,
-            mc,
-            ServerAddress.parseString(address),
-            serverData,
-            false,
-            null
-        );
+        // ConnectScreen.startConnecting calls mc.disconnect() BEFORE
+        // setScreen(ConnectScreen). When in SP, disconnect() synchronously
+        // halts the integrated server on the render thread — the screen
+        // freezes (looks black) for 5-30s with no way to leave. Work
+        // around: show a vanilla "Saving level…" screen FIRST so the
+        // render thread has something to display during the freeze, then
+        // defer startConnecting via mc.execute so the screen above paints
+        // at least one frame.
+        if (mc.hasSingleplayerServer()) {
+            RevivalPVPMod.LOGGER.info("In SP — showing Saving level screen before connect");
+            mc.setScreen(new net.minecraft.client.gui.screens.GenericMessageScreen(
+                net.minecraft.network.chat.Component.translatable("menu.savingLevel")));
+        }
+
+        mc.execute(() -> {
+            try {
+                ConnectScreen.startConnecting(
+                    mc.screen,
+                    mc,
+                    ServerAddress.parseString(address),
+                    serverData,
+                    false,
+                    null
+                );
+                RevivalPVPMod.LOGGER.info("startConnecting returned, mc.screen={}",
+                    mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>");
+            } catch (Throwable t) {
+                RevivalPVPMod.LOGGER.error("ConnectScreen.startConnecting threw for {}: {}",
+                    address, t.toString(), t);
+            }
+        });
     }
 
     /**
