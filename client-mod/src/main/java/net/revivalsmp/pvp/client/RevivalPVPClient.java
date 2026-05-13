@@ -7,7 +7,10 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+// Use the older HudRenderCallback API (available in fabric-api 0.119+)
+// instead of HudElementRegistry — the latter requires fabric-api 0.129+
+// which not all 1.21.11+ installs are guaranteed to ship.
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -54,8 +57,7 @@ public class RevivalPVPClient implements ClientModInitializer {
         // Register plugin message channels for duel server communication
         DuelServerListener.register();
 
-        HudElementRegistry.addLast(
-            Identifier.fromNamespaceAndPath("revival-pvp", "hud"),
+        HudRenderCallback.EVENT.register(
             (guiGraphics, deltaTracker) -> hud.render(guiGraphics, deltaTracker)
         );
 
