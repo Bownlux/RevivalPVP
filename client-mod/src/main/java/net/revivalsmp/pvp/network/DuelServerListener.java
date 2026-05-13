@@ -11,7 +11,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.revivalsmp.pvp.RevivalPVPMod;
 import net.revivalsmp.pvp.client.RevivalPVPClient;
 
@@ -38,10 +38,10 @@ import java.nio.charset.StandardCharsets;
  */
 public class DuelServerListener {
 
-    public static final Identifier CH_AUTH        = Identifier.fromNamespaceAndPath("revivalpvp", "auth");
-    public static final Identifier CH_DUEL_START  = Identifier.fromNamespaceAndPath("revivalpvp", "duel_start");
-    public static final Identifier CH_DUEL_END    = Identifier.fromNamespaceAndPath("revivalpvp", "duel_end");
-    public static final Identifier CH_RETURN      = Identifier.fromNamespaceAndPath("revivalpvp", "return");
+    public static final ResourceLocation CH_AUTH        = ResourceLocation.fromNamespaceAndPath("revivalpvp", "auth");
+    public static final ResourceLocation CH_DUEL_START  = ResourceLocation.fromNamespaceAndPath("revivalpvp", "duel_start");
+    public static final ResourceLocation CH_DUEL_END    = ResourceLocation.fromNamespaceAndPath("revivalpvp", "duel_end");
+    public static final ResourceLocation CH_RETURN      = ResourceLocation.fromNamespaceAndPath("revivalpvp", "return");
 
     public static final CustomPacketPayload.Type<AuthC2S>      AUTH_TYPE       = new CustomPacketPayload.Type<>(CH_AUTH);
     public static final CustomPacketPayload.Type<DuelStartS2C> DUEL_START_TYPE = new CustomPacketPayload.Type<>(CH_DUEL_START);
@@ -50,10 +50,10 @@ public class DuelServerListener {
 
     public static void register() {
         // Register payload types
-        PayloadTypeRegistry.serverboundPlay().register(AUTH_TYPE, AuthC2S.CODEC);
-        PayloadTypeRegistry.clientboundPlay().register(DUEL_START_TYPE, DuelStartS2C.CODEC);
-        PayloadTypeRegistry.clientboundPlay().register(DUEL_END_TYPE, DuelEndS2C.CODEC);
-        PayloadTypeRegistry.clientboundPlay().register(RETURN_TYPE, ReturnS2C.CODEC);
+        PayloadTypeRegistry.playC2S().register(AUTH_TYPE, AuthC2S.CODEC);
+        PayloadTypeRegistry.playS2C().register(DUEL_START_TYPE, DuelStartS2C.CODEC);
+        PayloadTypeRegistry.playS2C().register(DUEL_END_TYPE, DuelEndS2C.CODEC);
+        PayloadTypeRegistry.playS2C().register(RETURN_TYPE, ReturnS2C.CODEC);
 
         // Send auth token immediately on joining the duel server
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {

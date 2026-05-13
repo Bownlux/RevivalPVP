@@ -6,12 +6,12 @@ package net.revivalsmp.pvp.client;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.revivalsmp.pvp.client.hud.PVPHud;
 import net.revivalsmp.pvp.client.screen.MatchResultScreen;
 import net.revivalsmp.pvp.client.screen.PVPHubScreen;
@@ -39,11 +39,11 @@ public class RevivalPVPClient implements ClientModInitializer {
         // Default Y, vanilla 1.21+ doesn't bind Y, so no collision. Users
         // can rebind via Options → Controls → RevivalPVP, or use the
         // pause-menu button added by PauseScreenMixin.
-        openHubKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        openHubKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.revival-pvp.open_hub",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_Y,
-            KeyMapping.Category.MISC
+            "key.categories.misc"
         ));
 
         backendWS  = new BackendWS();
@@ -55,7 +55,7 @@ public class RevivalPVPClient implements ClientModInitializer {
         DuelServerListener.register();
 
         HudElementRegistry.addLast(
-            Identifier.fromNamespaceAndPath("revival-pvp", "hud"),
+            ResourceLocation.fromNamespaceAndPath("revival-pvp", "hud"),
             (guiGraphics, deltaTracker) -> hud.render(guiGraphics, deltaTracker)
         );
 
