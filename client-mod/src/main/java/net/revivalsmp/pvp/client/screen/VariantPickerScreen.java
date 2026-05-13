@@ -106,8 +106,8 @@ public class VariantPickerScreen extends Screen {
 
         // Header
         String title = "§b§lChoose Variant, §f" + slot;
-        g.text(font, Component.literal(title), panelX + PANEL_PADDING, panelY + 10, TEXT_PRIMARY, false);
-        g.text(font, "§8[Esc] cancel", panelX + panelW - PANEL_PADDING - 70, panelY + 10, TEXT_MUTED, false);
+        g.drawString(font, Component.literal(title), panelX + PANEL_PADDING, panelY + 10, TEXT_PRIMARY, false);
+        g.drawString(font, "§8[Esc] cancel", panelX + panelW - PANEL_PADDING - 70, panelY + 10, TEXT_MUTED, false);
 
         // Grid
         int gridX = panelX + PANEL_PADDING;
@@ -138,7 +138,7 @@ public class VariantPickerScreen extends Screen {
         int iconX = x + 8;
         int iconY = y + 8;
         if (icon != null && !icon.isEmpty()) {
-            g.item(icon, iconX, iconY);
+            g.renderItem(icon, iconX, iconY);
         } else {
             g.fill(iconX, iconY, iconX + 16, iconY + 16, 0xFF2A2A3A);
         }
@@ -165,7 +165,7 @@ public class VariantPickerScreen extends Screen {
         // font.split for clipping, just render first line.
         var nameLines = font.split(nameC, maxNameW);
         if (!nameLines.isEmpty()) {
-            g.text(font, nameLines.get(0), textX, textY, TEXT_PRIMARY);
+            g.drawString(font, nameLines.get(0), textX, textY, TEXT_PRIMARY);
         }
 
         // Description (wrapped, multi-line, clipped to remaining card height)
@@ -178,13 +178,13 @@ public class VariantPickerScreen extends Screen {
         int drawn = 0;
         for (var line : font.split(Component.literal("§7" + desc), CARD_W - 16)) {
             if (drawn >= maxLines) break;
-            g.text(font, line, x + 8, descY + drawn * lineHeight, TEXT_MUTED);
+            g.drawString(font, line, x + 8, descY + drawn * lineHeight, TEXT_MUTED);
             drawn++;
         }
 
         // Selected badge top-right
         if (selected) {
-            g.text(font, "§b§l✓", x + CARD_W - 14, y + 6, BORDER_COLOR, false);
+            g.drawString(font, "§b§l✓", x + CARD_W - 14, y + 6, BORDER_COLOR, false);
         }
     }
 

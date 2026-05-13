@@ -125,7 +125,7 @@ public class InfoScreen extends Screen {
         // Header: back button (left) + title (center) + open-web-button (right)
         renderTextBtn(g, mx, my, px + 8, py + 8, 44, 14,
             "§7← Back", 0xFF1A1A2A, 0xFF4A4A6A, K_BACK, 0);
-        g.centeredText(font, Component.literal("§b§lAccount"),
+        g.drawCenteredString(font, Component.literal("§b§lAccount"),
             cx, py + 10, PVPTheme.TEXT);
         renderTextBtn(g, mx, my, px + CARD_W - 60, py + 8, 52, 14,
             "§bWebsite ↗", 0xFF1A2A3A, 0xFF66E5FF, K_OPEN, 0);
@@ -134,11 +134,11 @@ public class InfoScreen extends Screen {
 
         // ── Connection block ────────────────────────────────────────────────
         if (meLoading && me == null) {
-            g.text(font, Component.literal("§7Loading..."), px + 12, rowY,
+            g.drawString(font, Component.literal("§7Loading..."), px + 12, rowY,
                 PVPTheme.TEXT_MUTED, false);
             rowY += 24;
         } else if (meError != null) {
-            g.text(font, Component.literal("§c" + meError), px + 12, rowY,
+            g.drawString(font, Component.literal("§c" + meError), px + 12, rowY,
                 0xFFFF6666, false);
             rowY += 24;
         } else if (me != null) {
@@ -147,22 +147,22 @@ public class InfoScreen extends Screen {
             boolean connected = ws != null && ws.isConnected();
             int dot = connected ? 0xFF44CC44 : 0xFFCC4444;
             g.fill(px + 12, rowY + 3, px + 17, rowY + 8, dot);
-            g.text(font, Component.literal(
+            g.drawString(font, Component.literal(
                 connected ? "§aConnected" : "§cOffline"),
                 px + 22, rowY, PVPTheme.TEXT, false);
 
             String username = optStr(me, "username", "?");
-            g.text(font, Component.literal("§f§l" + username),
+            g.drawString(font, Component.literal("§f§l" + username),
                 px + 12, rowY + 12, PVPTheme.TEXT, false);
 
             String mcUuid = optStr(me, "mc_uuid", null);
             if (mcUuid != null && mcUuid.length() >= 8) {
-                g.text(font, Component.literal("§7MC: " + mcUuid.substring(0, 8) + "…"),
+                g.drawString(font, Component.literal("§7MC: " + mcUuid.substring(0, 8) + "…"),
                     px + 12, rowY + 24, PVPTheme.TEXT_MUTED, false);
             }
             String iss = optStr(me, "iss", null);
             if (iss != null) {
-                g.text(font, Component.literal("§8via " + shortIssuer(iss)),
+                g.drawString(font, Component.literal("§8via " + shortIssuer(iss)),
                     px + CARD_W - 12 - font.width("via " + shortIssuer(iss)),
                     rowY + 24, PVPTheme.TEXT_MUTED, false);
             }
@@ -171,10 +171,10 @@ public class InfoScreen extends Screen {
             // ── Coin balance + earnings ───────────────────────────────────
             int coinBal = optInt(me, "coin_balance", 0);
             int paidBal = optInt(me, "paid_balance", 0);
-            g.text(font, Component.literal("§d♥ §f" + coinBal + " §7coins"),
+            g.drawString(font, Component.literal("§d♥ §f" + coinBal + " §7coins"),
                 px + 12, rowY, PVPTheme.TEXT, false);
             if (paidBal != coinBal) {
-                g.text(font, Component.literal("§8(" + paidBal + " paid)"),
+                g.drawString(font, Component.literal("§8(" + paidBal + " paid)"),
                     px + 12 + font.width("♥ " + coinBal + " coins ") + 6, rowY,
                     PVPTheme.TEXT_MUTED, false);
             }
@@ -185,14 +185,14 @@ public class InfoScreen extends Screen {
             double minP  = optDouble(me, "min_payout_usd",     10);
             String earn = String.format("§a$%.2f §7available §8· §7$%.2f held §8· §7min $%.0f",
                 avail, held, minP);
-            g.text(font, Component.literal(earn), px + 12, rowY, PVPTheme.TEXT_MUTED, false);
+            g.drawString(font, Component.literal(earn), px + 12, rowY, PVPTheme.TEXT_MUTED, false);
             rowY += 16;
         }
 
         // ── Web Login Code section ──────────────────────────────────────────
         g.fill(px + 8, rowY, px + CARD_W - 8, rowY + 1, 0xFF2A2A3A);
         rowY += 6;
-        g.text(font, Component.literal("§b§lWeb Login"), px + 12, rowY,
+        g.drawString(font, Component.literal("§b§lWeb Login"), px + 12, rowY,
             0xFF66E5FF, false);
         rowY += 12;
 
@@ -202,7 +202,7 @@ public class InfoScreen extends Screen {
             if (secsLeft <= 0) {
                 loginCode = null;
             } else {
-                g.text(font, Component.literal(
+                g.drawString(font, Component.literal(
                     "§7Visit §brevivalpvp.net/login §7and enter:"),
                     px + 12, rowY, PVPTheme.TEXT_MUTED, false);
                 rowY += 12;
@@ -216,7 +216,7 @@ public class InfoScreen extends Screen {
                 int codeBoxMid   = (codeBoxLeft + codeBoxRight) / 2;
                 g.fill(codeBoxLeft - 1, rowY - 1, codeBoxRight + 1, rowY + 19, 0xFFFF6BA8);
                 g.fill(codeBoxLeft, rowY, codeBoxRight, rowY + 18, 0xFF101019);
-                g.centeredText(font, Component.literal("§f§l" + loginCode),
+                g.drawCenteredString(font, Component.literal("§f§l" + loginCode),
                     codeBoxMid, rowY + 5, PVPTheme.TEXT);
 
                 // Copy button, flips to "Copied!" for 1.5s after click.
@@ -231,7 +231,7 @@ public class InfoScreen extends Screen {
                 }
                 rowY += 22;
                 String tt = String.format("§8expires in %d:%02d", secsLeft / 60, secsLeft % 60);
-                g.text(font, Component.literal(tt), px + 12, rowY,
+                g.drawString(font, Component.literal(tt), px + 12, rowY,
                     PVPTheme.TEXT_MUTED, false);
                 rowY += 14;
             }
@@ -242,7 +242,7 @@ public class InfoScreen extends Screen {
                 btnLabel, 0xFF1A3A1A, 0xFF00CC44, K_GEN, 0);
             rowY += 22;
             if (codeError != null) {
-                g.text(font, Component.literal("§c" + codeError),
+                g.drawString(font, Component.literal("§c" + codeError),
                     px + 12, rowY, 0xFFFF6666, false);
                 rowY += 12;
             }
@@ -264,7 +264,7 @@ public class InfoScreen extends Screen {
         // update is detected) a clickable "Update available" pill.
         UpdateChecker.Result upd = UpdateChecker.latest();
         String verLine = "§8v" + BuildInfo.version();
-        g.text(font, Component.literal(verLine), px + 12, py + cardH - 22,
+        g.drawString(font, Component.literal(verLine), px + 12, py + cardH - 22,
             PVPTheme.TEXT_MUTED, false);
         if (upd != null && upd.updateAvailable() && upd.pageUrl() != null) {
             String label = "§e↑ Update to " + upd.latestVersion();
@@ -288,7 +288,7 @@ public class InfoScreen extends Screen {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, hover ? 0xFFFFFFFF & border | 0xFF000000 : border);
         g.fill(x, y, x + w, y + h, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, PVPTheme.TEXT);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, PVPTheme.TEXT);
         hitRects.add(new int[]{x, y, x + w, y + h, kind, idx});
     }
 

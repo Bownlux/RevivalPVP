@@ -93,8 +93,8 @@ public class AddFriendModal extends Screen {
         g.fill(px, py, px + pw, py + ph, PVPTheme.PANEL);
         g.fill(px, py, px + pw, py + 2, PVPTheme.BORDER);
 
-        g.centeredText(font, Component.literal("§b§lAdd Friend"), cx, py + 8, PVPTheme.TEXT);
-        g.centeredText(font, Component.literal("§7Type to search RevivalPVP players"),
+        g.drawCenteredString(font, Component.literal("§b§lAdd Friend"), cx, py + 8, PVPTheme.TEXT);
+        g.drawCenteredString(font, Component.literal("§7Type to search RevivalPVP players"),
             cx, py + 22, PVPTheme.TEXT_MUTED);
 
         // Suggestions list below the input.
@@ -105,7 +105,7 @@ public class AddFriendModal extends Screen {
             int ry = sy + i * 14;
             boolean hover = mx >= sx && mx < sx + 200 && my >= ry && my < ry + 13;
             g.fill(sx - 1, ry, sx + 201, ry + 13, hover ? 0xFF2A3A4A : 0xFF1F1F2C);
-            g.text(font, Component.literal("§7• §f" + suggestions.get(i)),
+            g.drawString(font, Component.literal("§7• §f" + suggestions.get(i)),
                 sx + 6, ry + 3, PVPTheme.TEXT, false);
             suggestionRects.add(new int[]{sx, ry, sx + 200, ry + 13});
         }
@@ -123,7 +123,7 @@ public class AddFriendModal extends Screen {
             var lines = font.split(Component.literal(status), sw);
             int sy2 = btnY - lines.size() * 10 - 4;
             for (int i = 0; i < lines.size(); i++) {
-                g.centeredText(font, lines.get(i), cx, sy2 + i * 10, statusColor);
+                g.drawCenteredString(font, lines.get(i), cx, sy2 + i * 10, statusColor);
             }
         }
 
@@ -154,7 +154,7 @@ public class AddFriendModal extends Screen {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, hover ? PVPTheme.BORDER : border);
         g.fill(x, y, x + w, y + h, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, PVPTheme.TEXT);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, PVPTheme.TEXT);
     }
 
     @Override

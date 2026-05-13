@@ -64,6 +64,6 @@ public class PVPHud {
 
     private void drawText(GuiGraphics g, String text, int x, int y, int color) {
         var font = Minecraft.getInstance().font;
-        g.text(font, text, x, y, color, false);
+        g.drawString(font, text, x, y, color, false);
     }
 }

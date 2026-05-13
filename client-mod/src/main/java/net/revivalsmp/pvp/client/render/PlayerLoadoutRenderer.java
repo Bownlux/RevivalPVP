@@ -98,7 +98,7 @@ public class PlayerLoadoutRenderer {
         float virtMouseX = cx + dx;
         float virtMouseY = eyeY + dy;
 
-        InventoryScreen.extractEntityInInventoryFollowsMouse(
+        InventoryScreen.renderEntityInInventoryFollowsMouse(
             g,
             x, y, x + w, y + h,
             scale,

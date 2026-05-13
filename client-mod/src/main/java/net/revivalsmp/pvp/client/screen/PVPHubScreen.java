@@ -282,7 +282,7 @@ public class PVPHubScreen extends Screen {
         g.fill(px, py, px + panelW, py + 2, BORDER_COLOR);
 
         // Title
-        g.text(font, "§b§lRevivalPVP", px + 12, py + 8, TEXT_PRIMARY, false);
+        g.drawString(font, "§b§lRevivalPVP", px + 12, py + 8, TEXT_PRIMARY, false);
 
         // Sponsor key balance pill (top-right of title row, above tab bar).
         renderKeyBalancePill(g, px, py, panelW, mx, my);
@@ -319,7 +319,7 @@ public class PVPHubScreen extends Screen {
             if (active) g.fill(tx, ty + 16, tx + tabW, ty + 18, BORDER_COLOR);
             int labelColor = active ? BORDER_COLOR : TEXT_MUTED;
             String label = tab.name().substring(0, 1) + tab.name().substring(1).toLowerCase();
-            g.centeredText(font, Component.literal(label), tx + tabW / 2, ty + 5, labelColor);
+            g.drawCenteredString(font, Component.literal(label), tx + tabW / 2, ty + 5, labelColor);
         }
     }
 
@@ -400,7 +400,7 @@ public class PVPHubScreen extends Screen {
             // for ~6s above the QUEUE UP button so the user knows why their click was rejected.
             String err = matchmaking.lastErrorMessage();
             if (err != null && System.currentTimeMillis() - matchmaking.lastErrorAt() < 6000) {
-                g.centeredText(font, Component.literal("§c" + err),
+                g.drawCenteredString(font, Component.literal("§c" + err),
                     leftAreaX + leftAreaW / 2, btnY - 12, TEXT_MUTED);
             }
             renderBtn(g, btnX, btnY, 110, 22, "§a§l▶  QUEUE UP", 0xFF1A3A1A, 0xFF00CC44);
@@ -408,11 +408,11 @@ public class PVPHubScreen extends Screen {
             long secs = matchmaking.queueElapsedMs() / 1000;
             String label = String.format("§e⏳  %02d:%02d", secs / 60, secs % 60);
             renderBtn(g, btnX, btnY, 110, 22, label, 0xFF3A3A0A, 0xFFCCCC00);
-            g.centeredText(font, Component.literal("§7[click to cancel · ESC keeps queue]"),
+            g.drawCenteredString(font, Component.literal("§7[click to cancel · ESC keeps queue]"),
                 leftAreaX + leftAreaW / 2, btnY - 12, TEXT_MUTED);
         } else if (ms == MatchmakingService.State.MATCH_FOUND) {
             var m = matchmaking.activeMatch();
-            g.centeredText(font, Component.literal("§b⚔  Match found! vs §f" + m.opponentName()),
+            g.drawCenteredString(font, Component.literal("§b⚔  Match found! vs §f" + m.opponentName()),
                 leftAreaX + leftAreaW / 2, btnY - 12, TEXT_PRIMARY);
             // The map picker on the left drives the transition to CONNECTING via
             // map_selected. Until the backend locks a map in, the right-column
@@ -435,7 +435,7 @@ public class PVPHubScreen extends Screen {
             float pulse = 0.6f + 0.4f * (float) Math.sin(pulseAnim * 5);
             int alphaColor = ((int)(pulse * 255) << 24) | 0xCCCC00;
             renderBtn(g, btnX, btnY, 110, 22, "§e§l⏳ CONNECTING...", 0xFF2A2A0A, alphaColor);
-            g.centeredText(font, Component.literal("§7Transferring you to the duel server"),
+            g.drawCenteredString(font, Component.literal("§7Transferring you to the duel server"),
                 leftAreaX + leftAreaW / 2, btnY - 12, TEXT_MUTED);
         } else if (ms == MatchmakingService.State.IN_DUEL) {
             // Should auto-close, but if hub is reopened mid-duel show clear state.
@@ -485,7 +485,7 @@ public class PVPHubScreen extends Screen {
         int iconY = y + (KIT_CARD_H - 16) / 2;
         ItemStack iconStack = safeItem(kit.icon);
         if (iconStack != null) {
-            g.item(iconStack, iconX, iconY);
+            g.renderItem(iconStack, iconX, iconY);
         } else {
             g.fill(iconX, iconY, iconX + 16, iconY + 16, sel ? BORDER_COLOR : 0xFF333344);
         }
@@ -494,13 +494,13 @@ public class PVPHubScreen extends Screen {
         int textX = iconX + 20;
         int textY = y + (KIT_CARD_H - 8) / 2;
         int textColor = sel ? BORDER_COLOR : TEXT_PRIMARY;
-        g.text(font, Component.literal(kit.display), textX, textY, textColor, false);
+        g.drawString(font, Component.literal(kit.display), textX, textY, textColor, false);
     }
 
     private void renderArrow(GuiGraphics g, int x, int y, String label, boolean enabled) {
         int color = enabled ? BORDER_COLOR : 0xFF333344;
         g.fill(x - 1, y - 1, x + 17, y + 17, 0xFF1A1A2A);
-        g.centeredText(font, Component.literal(label), x + 8, y + 4, color);
+        g.drawCenteredString(font, Component.literal(label), x + 8, y + 4, color);
     }
 
     /** Slot-display order. Only slots actually present in the kit's by_slot are rendered. */
@@ -571,7 +571,7 @@ public class PVPHubScreen extends Screen {
         // Header
         var match = matchmaking.activeMatch();
         String header = "§b§lMAP VOTE";
-        g.centeredText(font, Component.literal(header), x + w / 2, y + 8, BORDER_COLOR);
+        g.drawCenteredString(font, Component.literal(header), x + w / 2, y + 8, BORDER_COLOR);
 
         // Sub-header: opponent + countdown
         long elapsedMs = matchmaking.matchFoundElapsedMs();
@@ -579,10 +579,10 @@ public class PVPHubScreen extends Screen {
         int  remaining = (int) Math.max(0, voteSecs - elapsedMs / 1000);
         String sub = "§7vs §f" + (match != null ? match.opponentName() : "?")
             + "   §8|   §7picks lock in §f" + remaining + "s";
-        g.centeredText(font, Component.literal(sub), x + w / 2, y + 22, TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal(sub), x + w / 2, y + 22, TEXT_MUTED);
 
         if (maps.isEmpty()) {
-            g.centeredText(font, Component.literal("§7Loading maps..."), x + w / 2, y + h / 2, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§7Loading maps..."), x + w / 2, y + h / 2, TEXT_MUTED);
             mapCardH = 0;
             return;
         }
@@ -631,9 +631,9 @@ public class PVPHubScreen extends Screen {
             g.fill(cx, cy, cx + cw, cy + cardH, fill);
 
             // Title
-            g.text(font, Component.literal("§f§l" + m.displayName()), cx + 12, cy + 10, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal("§f§l" + m.displayName()), cx + 12, cy + 10, TEXT_PRIMARY, false);
             // Description
-            g.text(font, Component.literal("§7" + m.description()), cx + 12, cy + 24, TEXT_MUTED, false);
+            g.drawString(font, Component.literal("§7" + m.description()), cx + 12, cy + 24, TEXT_MUTED, false);
 
             // Status pill (right side)
             String pill;
@@ -649,7 +649,7 @@ public class PVPHubScreen extends Screen {
                 pillColor = TEXT_MUTED;
             }
             int pillW = font.width(pill.replaceAll("§.", "")) + 12;
-            g.text(font, Component.literal(pill), cx + cw - pillW, cy + cardH - 14, pillColor, false);
+            g.drawString(font, Component.literal(pill), cx + cw - pillW, cy + cardH - 14, pillColor, false);
         }
         g.disableScissor();
 
@@ -687,14 +687,14 @@ public class PVPHubScreen extends Screen {
         int innerW = w - padding * 2;
 
         // Header: kit name
-        g.text(font, Component.literal("§b§l" + selectedKit.display), innerX, innerY, TEXT_PRIMARY, false);
+        g.drawString(font, Component.literal("§b§l" + selectedKit.display), innerX, innerY, TEXT_PRIMARY, false);
 
         // Compact description (1 line, truncated/wrapped to fit panel width).
         int lineY = innerY + 12;
         int lineHeight = 10;
         var descLines = font.split(Component.literal("§7" + selectedKit.description), innerW);
         if (!descLines.isEmpty()) {
-            g.text(font, descLines.get(0), innerX, lineY, TEXT_MUTED);
+            g.drawString(font, descLines.get(0), innerX, lineY, TEXT_MUTED);
             lineY += lineHeight;
         }
 
@@ -718,14 +718,14 @@ public class PVPHubScreen extends Screen {
             String msg = Boolean.TRUE.equals(loadoutLoading.get(selectedKit))
                 ? "§7Loading loadout..."
                 : "§8(Loadout unavailable. Defaults will be used.)";
-            g.centeredText(font, Component.literal(msg), innerX + innerW / 2, rowsTop + rowsAvail / 2 - 4, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), innerX + innerW / 2, rowsTop + rowsAvail / 2 - 4, TEXT_MUTED);
             loadoutRowsTotalH = 0;
             return;
         }
 
         JsonObject bySlot = loadout.has("by_slot") ? loadout.getAsJsonObject("by_slot") : null;
         if (bySlot == null || bySlot.size() == 0) {
-            g.centeredText(font, Component.literal("§7No customizable slots for this kit yet."),
+            g.drawCenteredString(font, Component.literal("§7No customizable slots for this kit yet."),
                 innerX + innerW / 2, rowsTop + rowsAvail / 2 - 4, TEXT_MUTED);
             loadoutRowsTotalH = 0;
             return;
@@ -822,7 +822,7 @@ public class PVPHubScreen extends Screen {
             }
         }
         if (icon != null && !icon.isEmpty()) {
-            g.item(icon, iconX, iconY);
+            g.renderItem(icon, iconX, iconY);
         } else {
             g.fill(iconX, iconY, iconX + 16, iconY + 16, 0xFF1F1F2C);
         }
@@ -831,7 +831,7 @@ public class PVPHubScreen extends Screen {
         int slotLabelX = iconX + 22;
         int slotLabelW = 50;
         int textY = y + (h - 8) / 2;
-        g.text(font, Component.literal("§7" + slotLabel(slot)), slotLabelX, textY, TEXT_MUTED, false);
+        g.drawString(font, Component.literal("§7" + slotLabel(slot)), slotLabelX, textY, TEXT_MUTED, false);
 
         // Variant name (white), clipped to remaining width
         int nameX = slotLabelX + slotLabelW;
@@ -840,12 +840,12 @@ public class PVPHubScreen extends Screen {
         String cleanName = stripLeadingLegacyColors(name);
         var nameLines = font.split(Component.literal("§f" + cleanName), nameMaxW);
         if (!nameLines.isEmpty()) {
-            g.text(font, nameLines.get(0), nameX, textY, TEXT_PRIMARY);
+            g.drawString(font, nameLines.get(0), nameX, textY, TEXT_PRIMARY);
         }
 
         // Right arrow indicator (clickable)
         int arrowColor = hover ? BORDER_COLOR : TEXT_MUTED;
-        g.text(font, Component.literal("§b▶"), arrowX, textY, arrowColor, false);
+        g.drawString(font, Component.literal("§b▶"), arrowX, textY, arrowColor, false);
     }
 
     private static String stripLeadingLegacyColors(String s) {
@@ -880,9 +880,9 @@ public class PVPHubScreen extends Screen {
         if (noLevel) {
             int cx = x + w / 2;
             int cy = viewerY + viewerH / 2 - 18;
-            g.centeredText(font, Component.literal("§f§lJoin a game"), cx, cy, TEXT_PRIMARY);
-            g.centeredText(font, Component.literal("§7to see your"), cx, cy + 14, TEXT_MUTED);
-            g.centeredText(font, Component.literal("§73D character"), cx, cy + 24, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§f§lJoin a game"), cx, cy, TEXT_PRIMARY);
+            g.drawCenteredString(font, Component.literal("§7to see your"), cx, cy + 14, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§73D character"), cx, cy + 24, TEXT_MUTED);
             hoveredItem = null;
         } else {
             // Belt-and-suspenders try/catch: even with a level, the
@@ -894,7 +894,7 @@ public class PVPHubScreen extends Screen {
             } catch (Throwable t) {
                 int cx = x + w / 2;
                 int cy = viewerY + viewerH / 2 - 6;
-                g.centeredText(font, Component.literal("§7Viewer warming up..."),
+                g.drawCenteredString(font, Component.literal("§7Viewer warming up..."),
                     cx, cy, TEXT_MUTED);
                 hoveredItem = null;
             }
@@ -925,20 +925,20 @@ public class PVPHubScreen extends Screen {
                     }
                 }
             }
-            g.text(font, Component.literal("§b" + displayName), labelX, labelY, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal("§b" + displayName), labelX, labelY, TEXT_PRIMARY, false);
             int dy = labelY + 12;
             int lineHeight = 10;
             int maxLines = (labelH - 18) / lineHeight;
             int drawn = 0;
             for (var line : font.split(Component.literal(description == null ? "" : description), labelW)) {
                 if (drawn >= maxLines) break;
-                g.text(font, line, labelX, dy, TEXT_MUTED);
+                g.drawString(font, line, labelX, dy, TEXT_MUTED);
                 dy += lineHeight;
                 drawn++;
             }
         } else {
-            g.centeredText(font, Component.literal("§8Hover the item"), x + w / 2, labelY + 4, TEXT_MUTED);
-            g.centeredText(font, Component.literal("§8in the figure"), x + w / 2, labelY + 14, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§8Hover the item"), x + w / 2, labelY + 4, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§8in the figure"), x + w / 2, labelY + 14, TEXT_MUTED);
         }
     }
 
@@ -988,7 +988,7 @@ public class PVPHubScreen extends Screen {
             int fg = active ? 0xFF0A0A0F : 0xFF8888AA;
             if ("sponsors".equals(id) && !active) fg = 0xFFFF6BA8;
             g.fill(pillX, scopeY, pillX + w, scopeY + pillH, bg);
-            g.text(font, "§r" + label, pillX + 6, scopeY + 3, fg, false);
+            g.drawString(font, "§r" + label, pillX + 6, scopeY + 3, fg, false);
             lbScopeRects.add(new int[]{ pillX, scopeY, pillX + w, scopeY + pillH });
             lbScopeIds.add(id);
             pillX += w + pillGap;
@@ -1000,7 +1000,7 @@ public class PVPHubScreen extends Screen {
         loadLeaderboardIfNeeded();
         if (leaderboardEntries == null) {
             String msg = leaderboardLoading ? "§7Loading leaderboard..." : "§cFailed to load leaderboard";
-            g.centeredText(font, Component.literal(msg), px + panelW / 2,
+            g.drawCenteredString(font, Component.literal(msg), px + panelW / 2,
                 bodyY + ((y + panelH) - bodyY) / 2, TEXT_MUTED);
             return;
         }
@@ -1008,7 +1008,7 @@ public class PVPHubScreen extends Screen {
             String empty = "sponsors".equals(leaderboardScope)
                 ? "§7No coins spent this season yet."
                 : "§7No ranked players in this kit yet.";
-            g.centeredText(font, Component.literal(empty), px + panelW / 2,
+            g.drawCenteredString(font, Component.literal(empty), px + panelW / 2,
                 bodyY + ((y + panelH) - bodyY) / 2, TEXT_MUTED);
             return;
         }
@@ -1017,16 +1017,16 @@ public class PVPHubScreen extends Screen {
         int rowX = px + 16, rowY = bodyY;
         boolean sponsorMode = "sponsors".equals(leaderboardScope);
         if (sponsorMode) {
-            g.text(font, "§7#",       rowX,        rowY, TEXT_MUTED, false);
-            g.text(font, "§7Player",  rowX + 28,   rowY, TEXT_MUTED, false);
-            g.text(font, "§7Coins",   rowX + 200,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7#",       rowX,        rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Player",  rowX + 28,   rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Coins",   rowX + 200,  rowY, TEXT_MUTED, false);
         } else {
-            g.text(font, "§7#",       rowX,        rowY, TEXT_MUTED, false);
-            g.text(font, "§7Player",  rowX + 28,   rowY, TEXT_MUTED, false);
-            g.text(font, "§7Rank",    rowX + 200,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7LP",      rowX + 320,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7W/L",     rowX + 380,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7Win%",    rowX + 440,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7#",       rowX,        rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Player",  rowX + 28,   rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Rank",    rowX + 200,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7LP",      rowX + 320,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7W/L",     rowX + 380,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Win%",    rowX + 440,  rowY, TEXT_MUTED, false);
         }
 
         int rowH = LB_ROW_H;
@@ -1040,18 +1040,18 @@ public class PVPHubScreen extends Screen {
             JsonObject e = leaderboardEntries.get(i).getAsJsonObject();
             int ry = rowY + 14 + i * rowH;
             if (sponsorMode) {
-                g.text(font, "§f" + e.get("rank").getAsString(),     rowX,        ry, TEXT_PRIMARY, false);
-                g.text(font, "§f" + e.get("username").getAsString(), rowX + 28,   ry, TEXT_PRIMARY, false);
-                g.text(font, "§d♥ " + e.get("coins").getAsString(),  rowX + 200,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§f" + e.get("rank").getAsString(),     rowX,        ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§f" + e.get("username").getAsString(), rowX + 28,   ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§d♥ " + e.get("coins").getAsString(),  rowX + 200,  ry, TEXT_PRIMARY, false);
             } else {
-                g.text(font, "§f" + e.get("rank_position").getAsString(),  rowX,        ry, TEXT_PRIMARY, false);
-                g.text(font, "§f" + e.get("username").getAsString(),       rowX + 28,   ry, TEXT_PRIMARY, false);
-                g.text(font, "§b" + e.get("rank").getAsString() + " " + e.get("division").getAsString(),
+                g.drawString(font, "§f" + e.get("rank_position").getAsString(),  rowX,        ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§f" + e.get("username").getAsString(),       rowX + 28,   ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§b" + e.get("rank").getAsString() + " " + e.get("division").getAsString(),
                                                                             rowX + 200,  ry, TEXT_PRIMARY, false);
-                g.text(font, "§e" + e.get("lp").getAsString(),              rowX + 320,  ry, TEXT_PRIMARY, false);
-                g.text(font, e.get("wins").getAsString() + "/" + e.get("games").getAsString(),
+                g.drawString(font, "§e" + e.get("lp").getAsString(),              rowX + 320,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, e.get("wins").getAsString() + "/" + e.get("games").getAsString(),
                                                                             rowX + 380,  ry, TEXT_PRIMARY, false);
-                g.text(font, e.get("win_rate").getAsString() + "%",         rowX + 440,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, e.get("win_rate").getAsString() + "%",         rowX + 440,  ry, TEXT_PRIMARY, false);
             }
         }
     }
@@ -1093,7 +1093,7 @@ public class PVPHubScreen extends Screen {
         int border = active ? BORDER_COLOR : 0xFF2A2A3A;
         g.fill(x - 1, y - 1, x + w + 1, y + 19, border);
         g.fill(x, y, x + w, y + 18, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + 5,
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + 5,
             active ? BORDER_COLOR : TEXT_MUTED);
     }
     /** Captured during render; consumed by mouseClicked for sub-tab clicks. */
@@ -1117,17 +1117,17 @@ public class PVPHubScreen extends Screen {
         g.fill(btnX - 1, btnY - 1, btnX + btnW + 1, btnY + btnH + 1, border);
         g.fill(btnX, btnY, btnX + btnW, btnY + btnH, fill);
         String label = canRefresh ? "§b⟲ REFRESH" : "§8⟲ ...";
-        g.centeredText(font, Component.literal(label), btnX + btnW / 2, btnY + 3,
+        g.drawCenteredString(font, Component.literal(label), btnX + btnW / 2, btnY + 3,
             canRefresh ? BORDER_COLOR : TEXT_MUTED);
         liveRefreshX = btnX; liveRefreshY = btnY; liveRefreshW = btnW; liveRefreshH = btnH;
         loadLiveDuelsIfNeeded();
         if (liveDuels == null) {
             String msg = liveDuelsLoading ? "§7Loading live duels..." : "§cFailed to load live duels.";
-            g.centeredText(font, Component.literal(msg), px + panelW / 2, y + panelH / 2, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), px + panelW / 2, y + panelH / 2, TEXT_MUTED);
             return;
         }
         if (liveDuels.isEmpty()) {
-            g.centeredText(font, Component.literal("§7No live duels right now, queue up to start one!"),
+            g.drawCenteredString(font, Component.literal("§7No live duels right now, queue up to start one!"),
                 px + panelW / 2, y + panelH / 2, TEXT_MUTED);
             return;
         }
@@ -1143,11 +1143,11 @@ public class PVPHubScreen extends Screen {
         int cPhase   = (int)(innerW * 0.72);
         int cSpec    = (int)(innerW * 0.86);
 
-        g.text(font, "§7Players",  rowX + cPlayers, rowY, TEXT_MUTED, false);
-        g.text(font, "§7Kit",      rowX + cKit,     rowY, TEXT_MUTED, false);
-        g.text(font, "§7M",        rowX + cMode,    rowY, TEXT_MUTED, false);
-        g.text(font, "§7Map",      rowX + cMap,     rowY, TEXT_MUTED, false);
-        g.text(font, "§7Phase",    rowX + cPhase,   rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7Players",  rowX + cPlayers, rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7Kit",      rowX + cKit,     rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7M",        rowX + cMode,    rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7Map",      rowX + cMap,     rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7Phase",    rowX + cPhase,   rowY, TEXT_MUTED, false);
 
         // Capture row hit-rects for click-to-spectate. Cleared each frame.
         spectateRowRects.clear();
@@ -1167,12 +1167,12 @@ public class PVPHubScreen extends Screen {
             String phase = m.has("phase") ? m.get("phase").getAsString() : "?";
 
             int ry = rowY + 14 + i * rowH;
-            g.text(font, "§f" + a + " §7vs §f" + b,           rowX + cPlayers, ry + 2, TEXT_PRIMARY, false);
-            g.text(font, "§b" + kit,                           rowX + cKit,     ry + 2, TEXT_PRIMARY, false);
-            g.text(font, ranked ? "§e§l[R]" : "§7§l[U]",        rowX + cMode,    ry + 2, TEXT_PRIMARY, false);
-            g.text(font, "§7" + map,                           rowX + cMap,     ry + 2, TEXT_PRIMARY, false);
+            g.drawString(font, "§f" + a + " §7vs §f" + b,           rowX + cPlayers, ry + 2, TEXT_PRIMARY, false);
+            g.drawString(font, "§b" + kit,                           rowX + cKit,     ry + 2, TEXT_PRIMARY, false);
+            g.drawString(font, ranked ? "§e§l[R]" : "§7§l[U]",        rowX + cMode,    ry + 2, TEXT_PRIMARY, false);
+            g.drawString(font, "§7" + map,                           rowX + cMap,     ry + 2, TEXT_PRIMARY, false);
             int phaseColor = "active".equals(phase) ? 0xFF66E099 : 0xFFFFC85A;
-            g.text(font, phase.toUpperCase(),                  rowX + cPhase,   ry + 2, phaseColor, false);
+            g.drawString(font, phase.toUpperCase(),                  rowX + cPhase,   ry + 2, phaseColor, false);
 
             // Spectate pill, only enabled for active duels (vote-phase duels
             // can't be entered yet; the plugin would kick).
@@ -1187,14 +1187,14 @@ public class PVPHubScreen extends Screen {
             g.fill(specX - 1, specY - 1, specX + specW + 1, specY + specH + 1, specBorder);
             g.fill(specX, specY, specX + specW, specY + specH, specFill);
             String specLabel = active ? "§b§lSPECTATE" : "§8--";
-            g.centeredText(font, Component.literal(specLabel), specX + specW / 2, specY + 2,
+            g.drawCenteredString(font, Component.literal(specLabel), specX + specW / 2, specY + 2,
                 active ? BORDER_COLOR : TEXT_MUTED);
             if (active && matchId != null) {
                 spectateRowRects.add(new int[]{specX, specY, specX + specW, specY + specH});
                 spectateMatchIds.add(matchId);
             }
         }
-        g.text(font, "§8Click §bSPECTATE§8 to watch a live duel, /spectatequit to leave.",
+        g.drawString(font, "§8Click §bSPECTATE§8 to watch a live duel, /spectatequit to leave.",
             rowX, y + panelH - 10, TEXT_MUTED, false);
     }
 
@@ -1219,10 +1219,10 @@ public class PVPHubScreen extends Screen {
             } else {
                 msg = "§cFailed to load history.";
             }
-            g.centeredText(font, Component.literal(msg),
+            g.drawCenteredString(font, Component.literal(msg),
                 px + panelW / 2, y + panelH / 2 - (hint != null ? 6 : 0), TEXT_MUTED);
             if (hint != null) {
-                g.centeredText(font, Component.literal(hint),
+                g.drawCenteredString(font, Component.literal(hint),
                     px + panelW / 2, y + panelH / 2 + 6, TEXT_MUTED);
             }
             return;
@@ -1231,7 +1231,7 @@ public class PVPHubScreen extends Screen {
             String msg = historyScope == HistoryScope.SELF
                 ? "§7No matches yet, queue up to play your first duel!"
                 : "§7No matches recorded yet on this server.";
-            g.centeredText(font, Component.literal(msg), px + panelW / 2, y + panelH / 2, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), px + panelW / 2, y + panelH / 2, TEXT_MUTED);
             return;
         }
 
@@ -1251,11 +1251,11 @@ public class PVPHubScreen extends Screen {
             int cMode   = (int)(innerW * 0.34);
             int cLp     = (int)(innerW * 0.55);
             int cWhen   = (int)(innerW * 0.68);
-            g.text(font, "§7Result", rowX + cResult, rowY, TEXT_MUTED, false);
-            g.text(font, "§7Kit",    rowX + cKit,    rowY, TEXT_MUTED, false);
-            g.text(font, "§7Mode",   rowX + cMode,   rowY, TEXT_MUTED, false);
-            g.text(font, "§7LP",     rowX + cLp,     rowY, TEXT_MUTED, false);
-            g.text(font, "§7When",   rowX + cWhen,   rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Result", rowX + cResult, rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Kit",    rowX + cKit,    rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Mode",   rowX + cMode,   rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7LP",     rowX + cLp,     rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7When",   rowX + cWhen,   rowY, TEXT_MUTED, false);
 
             for (int i = 0; i < n; i++) {
                 JsonObject m = historyEntries.get(i).getAsJsonObject();
@@ -1270,11 +1270,11 @@ public class PVPHubScreen extends Screen {
                 int lp = won
                     ? (m.has("lp_change_winner") && !m.get("lp_change_winner").isJsonNull() ? m.get("lp_change_winner").getAsInt() : 0)
                     : (m.has("lp_change_loser")  && !m.get("lp_change_loser").isJsonNull()  ? m.get("lp_change_loser").getAsInt()  : 0);
-                g.text(font, won ? "§a§lWIN" : "§c§lLOSS",   rowX + cResult, ry, TEXT_PRIMARY, false);
-                g.text(font, "§f" + kit,                     rowX + cKit,    ry, TEXT_PRIMARY, false);
-                g.text(font, "§7" + mode,                    rowX + cMode,   ry, TEXT_PRIMARY, false);
-                g.text(font, (lp >= 0 ? "§a+" : "§c") + lp,  rowX + cLp,     ry, TEXT_PRIMARY, false);
-                g.text(font, "§7" + when,                    rowX + cWhen,   ry, TEXT_PRIMARY, false);
+                g.drawString(font, won ? "§a§lWIN" : "§c§lLOSS",   rowX + cResult, ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§f" + kit,                     rowX + cKit,    ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§7" + mode,                    rowX + cMode,   ry, TEXT_PRIMARY, false);
+                g.drawString(font, (lp >= 0 ? "§a+" : "§c") + lp,  rowX + cLp,     ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§7" + when,                    rowX + cWhen,   ry, TEXT_PRIMARY, false);
             }
         } else {
             int cWin    = 0;
@@ -1282,11 +1282,11 @@ public class PVPHubScreen extends Screen {
             int cKit    = (int)(innerW * 0.42);
             int cMode   = (int)(innerW * 0.55);
             int cWhen   = (int)(innerW * 0.70);
-            g.text(font, "§7Winner",   rowX + cWin,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7vs Loser", rowX + cLose, rowY, TEXT_MUTED, false);
-            g.text(font, "§7Kit",      rowX + cKit,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7Mode",     rowX + cMode, rowY, TEXT_MUTED, false);
-            g.text(font, "§7When",     rowX + cWhen, rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Winner",   rowX + cWin,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7vs Loser", rowX + cLose, rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Kit",      rowX + cKit,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Mode",     rowX + cMode, rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7When",     rowX + cWhen, rowY, TEXT_MUTED, false);
 
             for (int i = 0; i < n; i++) {
                 JsonObject m = historyEntries.get(i).getAsJsonObject();
@@ -1299,11 +1299,11 @@ public class PVPHubScreen extends Screen {
                     ? m.get("winner_name").getAsString() : "?";
                 String ln = m.has("loser_name") && !m.get("loser_name").isJsonNull()
                     ? m.get("loser_name").getAsString() : "?";
-                g.text(font, "§a" + wn,    rowX + cWin,  ry, TEXT_PRIMARY, false);
-                g.text(font, "§c" + ln,    rowX + cLose, ry, TEXT_PRIMARY, false);
-                g.text(font, "§b" + kit,   rowX + cKit,  ry, TEXT_PRIMARY, false);
-                g.text(font, "§7" + mode,  rowX + cMode, ry, TEXT_PRIMARY, false);
-                g.text(font, "§7" + when,  rowX + cWhen, ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§a" + wn,    rowX + cWin,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§c" + ln,    rowX + cLose, ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§b" + kit,   rowX + cKit,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§7" + mode,  rowX + cMode, ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§7" + when,  rowX + cWhen, ry, TEXT_PRIMARY, false);
             }
         }
     }
@@ -1446,11 +1446,11 @@ public class PVPHubScreen extends Screen {
 
         if (playerRatings == null) {
             String msg = playerRatingsLoading ? "§8Loading placements..." : "§8No rating data";
-            g.centeredText(font, Component.literal(msg), x + w / 2, y + 3, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), x + w / 2, y + 3, TEXT_MUTED);
             return;
         }
         if (row == null) {
-            g.centeredText(font, Component.literal("§8No data for " + selectedKit.name()), x + w / 2, y + 3, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§8No data for " + selectedKit.name()), x + w / 2, y + 3, TEXT_MUTED);
             return;
         }
 
@@ -1461,7 +1461,7 @@ public class PVPHubScreen extends Screen {
             int lp = row.has("lp") && !row.get("lp").isJsonNull() ? row.get("lp").getAsInt() : 0;
             String line = "§7Placed.  §fCurrent: " + rankLegacyColor(rank) + rank + (division.isBlank() ? "" : " " + division)
                 + " §7• §e" + lp + " LP";
-            g.text(font, Component.literal(line), x + 6, y + 3, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal(line), x + 6, y + 3, TEXT_PRIMARY, false);
             return;
         }
 
@@ -1470,7 +1470,7 @@ public class PVPHubScreen extends Screen {
         int wins   = row.has("placement_wins") ? row.get("placement_wins").getAsInt() : 0;
 
         // Left-aligned label
-        g.text(font, Component.literal("§7Placements:"), x + 6, y + 3, TEXT_MUTED, false);
+        g.drawString(font, Component.literal("§7Placements:"), x + 6, y + 3, TEXT_MUTED, false);
 
         // 10-segment bar, each segment 8px wide with 1px gap. Total ~89px.
         int barX = x + 64;
@@ -1486,7 +1486,7 @@ public class PVPHubScreen extends Screen {
         // Right-aligned text "X/10  • W: Y"
         String stat = "§f" + played + "§7/§f10  §8•  §7W: §a" + wins;
         int statW = font.width(stat.replaceAll("§.", ""));
-        g.text(font, Component.literal(stat), x + w - statW - 6, y + 3, TEXT_PRIMARY, false);
+        g.drawString(font, Component.literal(stat), x + w - statW - 6, y + 3, TEXT_PRIMARY, false);
     }
 
     // ── F2: Rank band above the 3D viewer ────────────────────────────────────
@@ -1501,7 +1501,7 @@ public class PVPHubScreen extends Screen {
             int accent = playerRatingsLoading ? TEXT_MUTED : RANK_AMBER;
             g.fill(x, y, x + w, y + 2, accent);
             String msg = playerRatingsLoading ? "§7Loading rank..." : "§7No rating data";
-            g.centeredText(font, Component.literal(msg), x + w / 2, y + 14, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), x + w / 2, y + 14, TEXT_MUTED);
             // Bottom divider
             g.fill(x, y + h - 1, x + w, y + h, 0xFF2A2A3A);
             return;
@@ -1533,19 +1533,19 @@ public class PVPHubScreen extends Screen {
         g.fill(glyphX + 17, glyphY - 2, glyphX + 18, glyphY + 18, accent);
         try {
             ItemStack icon = new ItemStack(rankIconMaterial(placementDone ? rank : "UNRANKED"));
-            g.item(icon, glyphX, glyphY);
+            g.renderItem(icon, glyphX, glyphY);
         } catch (Throwable ignored) {}
 
         // Text stack, to the right of the glyph
         int textX = glyphX + 24;
         if (placementDone) {
             String line1 = "§l" + rankLegacyColor(rank) + rank.toUpperCase() + (division.isBlank() ? "" : " " + division);
-            g.text(font, Component.literal(line1), textX, y + 8, rankColor(rank), false);
+            g.drawString(font, Component.literal(line1), textX, y + 8, rankColor(rank), false);
             String line2 = "§7" + lp + " LP §8• §7" + wins + "W / " + played + "G";
-            g.text(font, Component.literal(line2), textX, y + 22, TEXT_MUTED, false);
+            g.drawString(font, Component.literal(line2), textX, y + 22, TEXT_MUTED, false);
         } else {
-            g.text(font, Component.literal("§7§lUNRANKED"), textX, y + 8, TEXT_MUTED, false);
-            g.text(font, Component.literal("§7Placement §f" + played + "§7/§f10"), textX, y + 22, TEXT_MUTED, false);
+            g.drawString(font, Component.literal("§7§lUNRANKED"), textX, y + 8, TEXT_MUTED, false);
+            g.drawString(font, Component.literal("§7Placement §f" + played + "§7/§f10"), textX, y + 22, TEXT_MUTED, false);
         }
 
         // Right-side division pips (or apex bar)
@@ -1801,7 +1801,7 @@ public class PVPHubScreen extends Screen {
                                   int px, int y, int panelW, int panelH) {
         FriendsService f = friendsService();
         if (f == null) {
-            g.centeredText(font, Component.literal("§7Friends service unavailable"),
+            g.drawCenteredString(font, Component.literal("§7Friends service unavailable"),
                 px + panelW / 2, y + panelH / 2, TEXT_MUTED);
             return;
         }
@@ -1825,7 +1825,7 @@ public class PVPHubScreen extends Screen {
             searchHover ? BORDER_COLOR : 0xFF2A2A3A);
         g.fill(barX, barY, barX + searchW, barY + barH,
             searchHover ? 0xFF14202A : 0xFF101019);
-        g.text(font, Component.literal("§7§o>  Click to search players and add a friend"),
+        g.drawString(font, Component.literal("§7§o>  Click to search players and add a friend"),
             barX + 6, barY + 5, TEXT_MUTED, false);
         // kind=4 reuses the "open Add Friend modal" handler.
         friendsHitRects.add(new int[]{barX, barY, barX + searchW, barY + barH, 4, 0});
@@ -1836,7 +1836,7 @@ public class PVPHubScreen extends Screen {
         g.fill(addBtnX - 1, barY - 1, addBtnX + addBtnW + 1, barY + barH + 1,
             addHover ? 0xFF66FF99 : 0xFF00CC44);
         g.fill(addBtnX, barY, addBtnX + addBtnW, barY + barH, 0xFF1A3A1A);
-        g.centeredText(font, Component.literal("§a§l+ ADD FRIEND"),
+        g.drawCenteredString(font, Component.literal("§a§l+ ADD FRIEND"),
             addBtnX + addBtnW / 2, barY + 5, 0xFF66FF99);
         friendsHitRects.add(new int[]{addBtnX, barY, addBtnX + addBtnW, barY + barH, 4, 0});
 
@@ -1848,7 +1848,7 @@ public class PVPHubScreen extends Screen {
         g.fill(refreshBtnX - 1, barY - 1, refreshBtnX + refreshBtnW + 1, barY + barH + 1,
             refreshHover ? BORDER_COLOR : 0xFF2A2A3A);
         g.fill(refreshBtnX, barY, refreshBtnX + refreshBtnW, barY + barH, 0xFF14202A);
-        g.centeredText(font, Component.literal("§b⟳"),
+        g.drawCenteredString(font, Component.literal("§b⟳"),
             refreshBtnX + refreshBtnW / 2, barY + 5, 0xFF66E5FF);
         friendsHitRects.add(new int[]{refreshBtnX, barY, refreshBtnX + refreshBtnW, barY + barH, 6, 0});
 
@@ -1856,7 +1856,7 @@ public class PVPHubScreen extends Screen {
         if (friendsToast != null
             && System.currentTimeMillis() - friendsToastAt < FRIENDS_TOAST_MS) {
             int toastY = y + 16;
-            g.centeredText(font, Component.literal(friendsToast),
+            g.drawCenteredString(font, Component.literal(friendsToast),
                 px + panelW / 2, toastY, friendsToastColor);
         }
 
@@ -1870,7 +1870,7 @@ public class PVPHubScreen extends Screen {
         if (totalPending == 0) {
             g.fill(px + 16 - 1, rowsTop - 1, px + 16 + pendW + 1, rowsTop + 18 + 1, 0xFF2A2A3A);
             g.fill(px + 16, rowsTop, px + 16 + pendW, rowsTop + 18, 0xFF1A1A2A);
-            g.text(font, Component.literal("§8No pending requests"),
+            g.drawString(font, Component.literal("§8No pending requests"),
                 px + 16 + 8, rowsTop + 5, TEXT_MUTED, false);
             pendingExpanded = false;
         } else {
@@ -1883,7 +1883,7 @@ public class PVPHubScreen extends Screen {
                 + (incoming.isEmpty() || outgoing.isEmpty() ? "" : " §8· ")
                 + (outgoing.isEmpty() ? "" : "§b" + outgoing.size() + " sent")
                 + " §7, click to " + (pendingExpanded ? "collapse" : "expand");
-            g.text(font, Component.literal(label), px + 16 + 8, rowsTop + 5, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal(label), px + 16 + 8, rowsTop + 5, TEXT_PRIMARY, false);
             friendsHitRects.add(new int[]{px + 16, rowsTop, px + 16 + pendW, rowsTop + 18, 5, 0});
         }
 
@@ -1907,7 +1907,7 @@ public class PVPHubScreen extends Screen {
         // ── Friends list ─────────────────────────────────────────────────────
         var list = f.friends();
         if (list.isEmpty()) {
-            g.centeredText(font, Component.literal("§7No friends yet, invite someone with [+ ADD FRIEND]"),
+            g.drawCenteredString(font, Component.literal("§7No friends yet, invite someone with [+ ADD FRIEND]"),
                 px + panelW / 2, listTop + 30, TEXT_MUTED);
             return;
         }
@@ -1928,7 +1928,7 @@ public class PVPHubScreen extends Screen {
         g.fill(x - 1, y - 1, x + w + 1, y + 19, 0xFF2A2A3A);
         g.fill(x, y, x + w, y + 18, 0xFF101019);
 
-        g.text(font, Component.literal("§f" + req.senderUsername()),
+        g.drawString(font, Component.literal("§f" + req.senderUsername()),
             x + 8, y + 5, TEXT_PRIMARY, false);
 
         // [Accept] [Reject] pills on the right.
@@ -1965,10 +1965,10 @@ public class PVPHubScreen extends Screen {
                                             FriendsService.OutgoingRequest req) {
         g.fill(x - 1, y - 1, x + w + 1, y + 19, 0xFF1A2A3A);
         g.fill(x, y, x + w, y + 18, 0xFF0F1620);
-        g.text(font, Component.literal("§b→ §f" + req.targetUsername()),
+        g.drawString(font, Component.literal("§b→ §f" + req.targetUsername()),
             x + 8, y + 5, TEXT_PRIMARY, false);
         String hint = "§8awaiting reply";
-        g.text(font, Component.literal(hint),
+        g.drawString(font, Component.literal(hint),
             x + w - font.width("awaiting reply") - 8, y + 5, TEXT_MUTED, false);
     }
 
@@ -1999,7 +1999,7 @@ public class PVPHubScreen extends Screen {
         }
 
         // Username.
-        g.text(font, Component.literal("§f" + fr.username()),
+        g.drawString(font, Component.literal("§f" + fr.username()),
             x + 20, y + 6, TEXT_PRIMARY, false);
 
         // Presence dot + label.
@@ -2017,7 +2017,7 @@ public class PVPHubScreen extends Screen {
             case "in_duel"  -> "duel";
             default         -> "offline";
         };
-        g.text(font, Component.literal("§7" + stateLabel),
+        g.drawString(font, Component.literal("§7" + stateLabel),
             dotX + 8, y + 6, TEXT_MUTED, false);
 
         // Kit-rank stub if present.
@@ -2025,7 +2025,7 @@ public class PVPHubScreen extends Screen {
             String text = rankLegacyColor(fr.rank()) + fr.rank().substring(0, 1) + fr.rank().substring(1).toLowerCase()
                 + (fr.division() == null || fr.division().isBlank() ? "" : " " + fr.division())
                 + " §7" + fr.lp() + "LP";
-            g.text(font, Component.literal(text), x + w - 200, y + 6, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal(text), x + w - 200, y + 6, TEXT_PRIMARY, false);
         }
 
         // Buttons. Invite ALWAYS rendered, disabled (greyed) when friend
@@ -2060,13 +2060,13 @@ public class PVPHubScreen extends Screen {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + 16;
         g.fill(x - 1, y - 1, x + w + 1, y + 17, hover ? BORDER_COLOR : border);
         g.fill(x, y, x + w, y + 16, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + 4, TEXT_PRIMARY);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + 4, TEXT_PRIMARY);
     }
 
     private void renderBtn(GuiGraphics g, int x, int y, int w, int h, String label, int bg, int border) {
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, border);
         g.fill(x, y, x + w, y + h, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
     }
 
     // ── Friends data + sponsor data lifecycle ─────────────────────────────────
@@ -2121,7 +2121,7 @@ public class PVPHubScreen extends Screen {
         int fill   = hover ? 0xFF1A2A3A : 0xFF0E1A24;
         g.fill(x - 1, y - 1, x + pillW + 1, y + pillH + 1, border);
         g.fill(x, y, x + pillW, y + pillH, fill);
-        g.centeredText(font, Component.literal("§b§lⓘ Account"),
+        g.drawCenteredString(font, Component.literal("§b§lⓘ Account"),
             x + pillW / 2, y + 3, BORDER_COLOR);
         infoIconRect = new int[]{x, y, x + pillW, y + pillH};
     }
@@ -2149,7 +2149,7 @@ public class PVPHubScreen extends Screen {
             int border = hover ? 0xFFFF99CC : 0xFFFF6BA8;
             g.fill(x - 1, y - 1, x + pillW + 1, y + pillH + 1, border);
             g.fill(x, y, x + pillW, y + pillH, 0xFF1A1020);
-            g.centeredText(font, Component.literal("§d♥ §f" + coinBalance + " coins"),
+            g.drawCenteredString(font, Component.literal("§d♥ §f" + coinBalance + " coins"),
                 x + pillW / 2, y + 3, 0xFFFF99CC);
             coinPillRect = new int[]{x, y, x + pillW, y + pillH};
         } else {
@@ -2164,7 +2164,7 @@ public class PVPHubScreen extends Screen {
             int w = font.width(text.replaceAll("§.", ""));
             int x = px + panelW - w - 12;
             int y = (coinBalance > 0) ? (py + 22) : (py + 8);
-            g.text(font, Component.literal(text), x, y, RANK_AMBER, false);
+            g.drawString(font, Component.literal(text), x, y, RANK_AMBER, false);
         }
     }
 
@@ -2184,9 +2184,9 @@ public class PVPHubScreen extends Screen {
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, BORDER_COLOR);
         g.fill(x, y, x + w, y + h, 0xFF1C1C2C);
 
-        g.text(font, Component.literal("§b§l⚔ Duel Invite"), x + 8, y + 8, BORDER_COLOR, false);
-        g.text(font, Component.literal("§ffrom §f§l" + inv.otherUsername()), x + 8, y + 22, TEXT_PRIMARY, false);
-        g.text(font, Component.literal("§7" + inv.kit() + (inv.ranked() ? " · ranked" : " · unranked")),
+        g.drawString(font, Component.literal("§b§l⚔ Duel Invite"), x + 8, y + 8, BORDER_COLOR, false);
+        g.drawString(font, Component.literal("§ffrom §f§l" + inv.otherUsername()), x + 8, y + 22, TEXT_PRIMARY, false);
+        g.drawString(font, Component.literal("§7" + inv.kit() + (inv.ranked() ? " · ranked" : " · unranked")),
             x + 8, y + 32, TEXT_MUTED, false);
 
         int axB = x + 8, ayB = y + 44;
@@ -2220,7 +2220,7 @@ public class PVPHubScreen extends Screen {
         boolean backHover = mx >= x && mx < x + 50 && my >= y + 8 && my < y + 24;
         g.fill(x - 1, y + 7, x + 51, y + 25, backHover ? BORDER_COLOR : 0xFF2A2A3A);
         g.fill(x, y + 8, x + 50, y + 24, 0xFF1A1A2A);
-        g.centeredText(font, Component.literal("§7← Back"), x + 25, y + 12, TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal("§7← Back"), x + 25, y + 12, TEXT_MUTED);
         detailBackRect = new int[]{x, y + 8, x + 50, y + 24};
 
         // Header row.
@@ -2256,9 +2256,9 @@ public class PVPHubScreen extends Screen {
         g.fill(x + 32, headY,   x + 33,   headY + 32,  0xFF2A2A3A);
 
         int rankPos     = playerDetailEntry.has("rank_position") ? playerDetailEntry.get("rank_position").getAsInt() : 0;
-        g.text(font, Component.literal("§f§l" + username),
+        g.drawString(font, Component.literal("§f§l" + username),
             x + 40, headY + 4, TEXT_PRIMARY, false);
-        g.text(font, Component.literal("§7Global rank §f#" + rankPos),
+        g.drawString(font, Component.literal("§7Global rank §f#" + rankPos),
             x + 40, headY + 16, TEXT_MUTED, false);
 
         // Per-kit rank line, single row pulled from leaderboardEntry (one kit only).
@@ -2266,7 +2266,7 @@ public class PVPHubScreen extends Screen {
         String rank = optStrEntry(playerDetailEntry, "rank", "UNRANKED");
         String div  = optStrEntry(playerDetailEntry, "division", "");
         int lp = playerDetailEntry.has("lp") ? playerDetailEntry.get("lp").getAsInt() : 0;
-        g.text(font, Component.literal(rankLegacyColor(rank) + rank
+        g.drawString(font, Component.literal(rankLegacyColor(rank) + rank
                 + (div.isBlank() ? "" : " " + div) + " §7• §e" + lp + " LP"),
             x, kitsY, rankColor(rank), false);
 
@@ -2278,16 +2278,16 @@ public class PVPHubScreen extends Screen {
         if (sponsorH < 80) sponsorH = 80;
         g.fill(x - 1, sponsorY - 1, x + innerW + 1, sponsorY + sponsorH + 1, 0xFF2A2A3A);
         g.fill(x, sponsorY, x + innerW, sponsorY + sponsorH, 0xFF101019);
-        g.text(font, Component.literal("§d§l♥ Sponsorship"), x + 8, sponsorY + 6, 0xFFFF6BA8, false);
+        g.drawString(font, Component.literal("§d§l♥ Sponsorship"), x + 8, sponsorY + 6, 0xFFFF6BA8, false);
 
         if (playerDetailLoading) {
-            g.text(font, Component.literal("§7Loading sponsor data..."),
+            g.drawString(font, Component.literal("§7Loading sponsor data..."),
                 x + 8, sponsorY + 22, TEXT_MUTED, false);
             detailSponsorListRect = null;
         } else if (playerDetailProfile != null) {
             int total  = playerDetailProfile.has("total_coins")  ? playerDetailProfile.get("total_coins").getAsInt()  : 0;
             int season = playerDetailProfile.has("season_coins") ? playerDetailProfile.get("season_coins").getAsInt() : 0;
-            g.text(font, Component.literal("§fTotal coins received: §d♥ " + total + " §7(season: " + season + ")"),
+            g.drawString(font, Component.literal("§fTotal coins received: §d♥ " + total + " §7(season: " + season + ")"),
                 x + 8, sponsorY + 22, TEXT_PRIMARY, false);
 
             // Top sponsors list, render as many rows as fit in the remaining
@@ -2308,7 +2308,7 @@ public class PVPHubScreen extends Screen {
             if (detailSponsorScroll < 0) detailSponsorScroll = 0;
 
             if (detailSponsorTotal == 0) {
-                g.text(font, Component.literal("§8No sponsors yet, be the first to back this player."),
+                g.drawString(font, Component.literal("§8No sponsors yet, be the first to back this player."),
                     x + 8, listTop, TEXT_MUTED, false);
             } else {
                 int shown = Math.min(visibleRows, detailSponsorTotal - detailSponsorScroll);
@@ -2317,7 +2317,7 @@ public class PVPHubScreen extends Screen {
                     JsonObject s = ts.get(idx).getAsJsonObject();
                     String name  = optStrEntry(s, "sponsor_name", "?");
                     int coins    = s.has("coins_spent") ? s.get("coins_spent").getAsInt() : 0;
-                    g.text(font, Component.literal("§7" + (idx + 1) + ". §f" + name + " §7, §d♥" + coins),
+                    g.drawString(font, Component.literal("§7" + (idx + 1) + ". §f" + name + " §7, §d♥" + coins),
                         x + 8, listTop + i * rowHeight, TEXT_PRIMARY, false);
                 }
                 // Scrollbar (only if scrollable).
@@ -2375,7 +2375,7 @@ public class PVPHubScreen extends Screen {
                 ? "§c" + lowBalanceMsg + " §7§n(click to buy more)"
                 : "§8Need more coins to sponsor. §7§n(click to buy on the website)";
             int hintW = font.width(msg);
-            g.text(font, Component.literal(msg), x, btnY - 12,
+            g.drawString(font, Component.literal(msg), x, btnY - 12,
                 showShortMsg ? 0xFFFF6BA8 : TEXT_MUTED, false);
             detailBuyCoinsRect = new int[]{ x, btnY - 14, x + hintW, btnY - 2 };
         } else {
@@ -2388,7 +2388,7 @@ public class PVPHubScreen extends Screen {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, hover ? 0xFFFF99CC : border);
         g.fill(x, y, x + w, y + h, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
     }
 
     private void loadPlayerDetailIfNeeded() {
@@ -2633,7 +2633,7 @@ public class PVPHubScreen extends Screen {
         int border = active ? BORDER_COLOR : 0xFF2A2A3A;
         g.fill(x - 1, y - 1, x + 79, y + 19, border);
         g.fill(x, y, x + 78, y + 18, bg);
-        g.centeredText(font, Component.literal(label), x + 39, y + 5, active ? BORDER_COLOR : TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal(label), x + 39, y + 5, active ? BORDER_COLOR : TEXT_MUTED);
     }
 
     /** Smaller pill button for the scope picker (Local/Region/Global), 48px wide. */
@@ -2643,7 +2643,7 @@ public class PVPHubScreen extends Screen {
         int border = active ? BORDER_COLOR : 0xFF2A2A3A;
         g.fill(x - 1, y - 1, x + 49, y + 19, border);
         g.fill(x, y, x + 48, y + 18, bg);
-        g.centeredText(font, Component.literal(label), x + 24, y + 5, active ? BORDER_COLOR : TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal(label), x + 24, y + 5, active ? BORDER_COLOR : TEXT_MUTED);
     }
 
     // ---------------- Mouse / keyboard ----------------
