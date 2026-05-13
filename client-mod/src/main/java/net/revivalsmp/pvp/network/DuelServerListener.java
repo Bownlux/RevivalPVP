@@ -50,10 +50,10 @@ public class DuelServerListener {
 
     public static void register() {
         // Register payload types
-        PayloadTypeRegistry.serverboundPlay().register(AUTH_TYPE, AuthC2S.CODEC);
-        PayloadTypeRegistry.clientboundPlay().register(DUEL_START_TYPE, DuelStartS2C.CODEC);
-        PayloadTypeRegistry.clientboundPlay().register(DUEL_END_TYPE, DuelEndS2C.CODEC);
-        PayloadTypeRegistry.clientboundPlay().register(RETURN_TYPE, ReturnS2C.CODEC);
+        PayloadTypeRegistry.playC2S().register(AUTH_TYPE, AuthC2S.CODEC);
+        PayloadTypeRegistry.playS2C().register(DUEL_START_TYPE, DuelStartS2C.CODEC);
+        PayloadTypeRegistry.playS2C().register(DUEL_END_TYPE, DuelEndS2C.CODEC);
+        PayloadTypeRegistry.playS2C().register(RETURN_TYPE, ReturnS2C.CODEC);
 
         // Send auth token immediately on joining the duel server
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {

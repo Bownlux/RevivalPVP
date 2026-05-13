@@ -7,7 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -264,7 +264,7 @@ public class PVPHubScreen extends Screen {
     public boolean isPauseScreen() { return false; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         pulseAnim += delta * 0.05f;
 
         int w = width, h = height;
@@ -306,10 +306,10 @@ public class PVPHubScreen extends Screen {
         // Incoming-duel-invite overlay sits on top of any tab.
         renderInviteOverlay(g, px, py, panelW, mx, my);
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
-    private void renderTabs(GuiGraphicsExtractor g, int px, int ty, int panelW) {
+    private void renderTabs(GuiGraphics g, int px, int ty, int panelW) {
         int tabW = panelW / Tab.values().length;
         for (int i = 0; i < Tab.values().length; i++) {
             Tab tab = Tab.values()[i];
@@ -325,7 +325,7 @@ public class PVPHubScreen extends Screen {
 
     // ---------------- Queue tab ----------------
 
-    private void renderQueueTab(GuiGraphicsExtractor g, int mx, int my, int px, int y, int panelW, int panelH) {
+    private void renderQueueTab(GuiGraphics g, int mx, int my, int px, int y, int panelW, int panelH) {
         // Layout:
         //   right column = 3D viewer + hover label + queue/accept button (stacked)
         //   left column  = ranked/scope toggles + kit list + loadout editor (full height)
@@ -444,7 +444,7 @@ public class PVPHubScreen extends Screen {
     }
 
     /** Horizontally scrolling kit list with [icon] Name cards and left/right arrow buttons. */
-    private void renderKitList(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
+    private void renderKitList(GuiGraphics g, int mx, int my, int x, int y, int w, int h) {
         Kit[] kits = Kit.values();
         int totalContentW = kits.length * KIT_CARD_W + (kits.length - 1) * KIT_CARD_GAP;
         int maxScroll = Math.max(0, totalContentW - w);
@@ -469,7 +469,7 @@ public class PVPHubScreen extends Screen {
         renderArrow(g, x + w + 2, y + h / 2 - 8, "►", canRight);
     }
 
-    private void renderKitCard(GuiGraphicsExtractor g, Kit kit, int x, int y, int mx, int my) {
+    private void renderKitCard(GuiGraphics g, Kit kit, int x, int y, int mx, int my) {
         boolean sel = kit == selectedKit;
         boolean hover = mx >= x && mx < x + KIT_CARD_W && my >= y && my < y + KIT_CARD_H;
         int border = sel ? BORDER_COLOR : (hover ? 0xFF4A4A6A : 0xFF2A2A3A);
@@ -497,7 +497,7 @@ public class PVPHubScreen extends Screen {
         g.text(font, Component.literal(kit.display), textX, textY, textColor, false);
     }
 
-    private void renderArrow(GuiGraphicsExtractor g, int x, int y, String label, boolean enabled) {
+    private void renderArrow(GuiGraphics g, int x, int y, String label, boolean enabled) {
         int color = enabled ? BORDER_COLOR : 0xFF333344;
         g.fill(x - 1, y - 1, x + 17, y + 17, 0xFF1A1A2A);
         g.centeredText(font, Component.literal(label), x + 8, y + 4, color);
@@ -537,7 +537,7 @@ public class PVPHubScreen extends Screen {
     private static final net.minecraft.resources.Identifier MATCH_BANNER_TEX =
         net.minecraft.resources.Identifier.fromNamespaceAndPath("revival-pvp", "textures/gui/match_banner.png");
 
-    private void renderMapPickerPanel(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
+    private void renderMapPickerPanel(GuiGraphics g, int mx, int my, int x, int y, int w, int h) {
         // Panel border
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF2A2A3A);
         // Base fill (kept as fallback if texture render fails)
@@ -670,7 +670,7 @@ public class PVPHubScreen extends Screen {
      * slot present in the current kit's by_slot, each row a clickable button that opens
      * the variant picker.
      */
-    private void renderLoadoutEditorPanel(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
+    private void renderLoadoutEditorPanel(GuiGraphics g, int mx, int my, int x, int y, int w, int h) {
         // Panel background
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF2A2A3A);
         g.fill(x, y, x + w, y + h, 0xFF141420);
@@ -796,7 +796,7 @@ public class PVPHubScreen extends Screen {
         return null;
     }
 
-    private void renderLoadoutRow(GuiGraphicsExtractor g, int mx, int my,
+    private void renderLoadoutRow(GuiGraphics g, int mx, int my,
                                   String slot, JsonObject variant,
                                   int x, int y, int w, int h) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
@@ -856,7 +856,7 @@ public class PVPHubScreen extends Screen {
     }
 
     /** Right content panel: 3D player figure + hovered-item label below it. */
-    private void renderPlayerViewerPanel(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
+    private void renderPlayerViewerPanel(GuiGraphics g, int mx, int my, int x, int y, int w, int h) {
         // Panel background
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF2A2A3A);
         g.fill(x, y, x + w, y + h, 0xFF0E0E18);
@@ -957,7 +957,7 @@ public class PVPHubScreen extends Screen {
         return id;
     }
 
-    private void renderLeaderboardTab(GuiGraphicsExtractor g, int mx, int my, int px, int y, int panelW, int panelH) {
+    private void renderLeaderboardTab(GuiGraphics g, int mx, int my, int px, int y, int panelW, int panelH) {
         // Sub-view: clicked-through to a player detail. Render that instead.
         if (playerDetailEntry != null) {
             renderPlayerDetailView(g, mx, my, px, y, panelW, panelH);
@@ -1058,7 +1058,7 @@ public class PVPHubScreen extends Screen {
 
     // ── Matches tab: Live + History ──────────────────────────────────────────
 
-    private void renderMatchesTab(GuiGraphicsExtractor g, int mx, int my, int px, int y, int panelW, int panelH) {
+    private void renderMatchesTab(GuiGraphics g, int mx, int my, int px, int y, int panelW, int panelH) {
         // Sub-tab header, two pill buttons LIVE | HISTORY
         int subY = y + 8;
         renderSubTab(g, px + 16, subY, "Live Duels", matchesSub == MatchesSub.LIVE, mx, my);
@@ -1086,7 +1086,7 @@ public class PVPHubScreen extends Screen {
     }
 
     /** Top-of-tab pill button used for Live/History + Self/Everyone toggles. */
-    private void renderSubTab(GuiGraphicsExtractor g, int x, int y, String label,
+    private void renderSubTab(GuiGraphics g, int x, int y, String label,
                               boolean active, int mx, int my) {
         int w = label.equals("Live Duels") ? 88 : (label.equals("History") ? 60 : 70);
         int bg     = active ? 0xFF1A2A3A : 0xFF0E0E18;
@@ -1102,7 +1102,7 @@ public class PVPHubScreen extends Screen {
     /** Refresh-button hit rect (Live Duels). Set each render in renderLiveDuels. */
     private int liveRefreshX, liveRefreshY, liveRefreshW, liveRefreshH;
 
-    private void renderLiveDuels(GuiGraphicsExtractor g, int mx, int my, int px, int y, int panelW, int panelH) {
+    private void renderLiveDuels(GuiGraphics g, int mx, int my, int px, int y, int panelW, int panelH) {
         // Refresh button, top-right of the Live Duels area. CD is implicit
         // (the cache TTL on liveDuelsFetchedAt). Click forces an immediate
         // refetch instead of waiting for the 5s auto-refresh.
@@ -1198,7 +1198,7 @@ public class PVPHubScreen extends Screen {
             rowX, y + panelH - 10, TEXT_MUTED, false);
     }
 
-    private void renderHistory(GuiGraphicsExtractor g, int px, int y, int panelW, int panelH) {
+    private void renderHistory(GuiGraphics g, int px, int y, int panelW, int panelH) {
         loadHistoryIfNeeded();
         if (historyEntries == null) {
             String msg = null;
@@ -1432,7 +1432,7 @@ public class PVPHubScreen extends Screen {
 
     // ── F1: Placement progress pill (above kit list) ─────────────────────────
 
-    private void renderPlacementPill(GuiGraphicsExtractor g, int x, int y, int w, int h) {
+    private void renderPlacementPill(GuiGraphics g, int x, int y, int w, int h) {
         loadPlayerRatingsIfNeeded();
 
         // Background + 1px border. Border accents amber while in placement to
@@ -1491,7 +1491,7 @@ public class PVPHubScreen extends Screen {
 
     // ── F2: Rank band above the 3D viewer ────────────────────────────────────
 
-    private void renderRankBand(GuiGraphicsExtractor g, int x, int y, int w, int h) {
+    private void renderRankBand(GuiGraphics g, int x, int y, int w, int h) {
         loadPlayerRatingsIfNeeded();
 
         // Background + tier-colored top stripe (resolved once row is fetched).
@@ -1797,7 +1797,7 @@ public class PVPHubScreen extends Screen {
         });
     }
 
-    private void renderFriendsTab(GuiGraphicsExtractor g, int mx, int my,
+    private void renderFriendsTab(GuiGraphics g, int mx, int my,
                                   int px, int y, int panelW, int panelH) {
         FriendsService f = friendsService();
         if (f == null) {
@@ -1922,7 +1922,7 @@ public class PVPHubScreen extends Screen {
         }
     }
 
-    private void renderPendingRequestRow(GuiGraphicsExtractor g, int mx, int my,
+    private void renderPendingRequestRow(GuiGraphics g, int mx, int my,
                                           int x, int y, int w,
                                           FriendsService.FriendRequest req) {
         g.fill(x - 1, y - 1, x + w + 1, y + 19, 0xFF2A2A3A);
@@ -1961,7 +1961,7 @@ public class PVPHubScreen extends Screen {
 
     /** Outgoing request row, read-only, dimmer styling, "Awaiting reply" hint
      *  on the right. No clicks; sender can't cancel from here in v1. */
-    private void renderOutgoingRequestRow(GuiGraphicsExtractor g, int x, int y, int w,
+    private void renderOutgoingRequestRow(GuiGraphics g, int x, int y, int w,
                                             FriendsService.OutgoingRequest req) {
         g.fill(x - 1, y - 1, x + w + 1, y + 19, 0xFF1A2A3A);
         g.fill(x, y, x + w, y + 18, 0xFF0F1620);
@@ -1972,7 +1972,7 @@ public class PVPHubScreen extends Screen {
             x + w - font.width("awaiting reply") - 8, y + 5, TEXT_MUTED, false);
     }
 
-    private void renderFriendRow(GuiGraphicsExtractor g, int mx, int my,
+    private void renderFriendRow(GuiGraphics g, int mx, int my,
                                   int x, int y, int w,
                                   FriendsService.Friend fr, int idx) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + 20;
@@ -2054,7 +2054,7 @@ public class PVPHubScreen extends Screen {
         friendsHitRects.add(new int[]{xX, y + 2, xX + 24, y + 18, 3, idx});
     }
 
-    private void renderSmallPill(GuiGraphicsExtractor g, int mx, int my,
+    private void renderSmallPill(GuiGraphics g, int mx, int my,
                                   int x, int y, int w, String label,
                                   int bg, int border) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + 16;
@@ -2063,7 +2063,7 @@ public class PVPHubScreen extends Screen {
         g.centeredText(font, Component.literal(label), x + w / 2, y + 4, TEXT_PRIMARY);
     }
 
-    private void renderBtn(GuiGraphicsExtractor g, int x, int y, int w, int h, String label, int bg, int border) {
+    private void renderBtn(GuiGraphics g, int x, int y, int w, int h, String label, int bg, int border) {
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, border);
         g.fill(x, y, x + w, y + h, bg);
         g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
@@ -2107,7 +2107,7 @@ public class PVPHubScreen extends Screen {
 
     // ── (i) info icon (top-right of title bar) ────────────────────────────────
 
-    private void renderInfoIcon(GuiGraphicsExtractor g, int px, int py, int panelW,
+    private void renderInfoIcon(GuiGraphics g, int px, int py, int panelW,
                                  int mx, int my) {
         // Visible "Account" pill at the right edge of the title row. Sits to
         // the LEFT of the coin pill if one is being rendered; otherwise
@@ -2128,7 +2128,7 @@ public class PVPHubScreen extends Screen {
 
     // ── Title-bar coin pill (♥ N) ─────────────────────────────────────────────
 
-    private void renderKeyBalancePill(GuiGraphicsExtractor g, int px, int py, int panelW,
+    private void renderKeyBalancePill(GuiGraphics g, int px, int py, int panelW,
                                        int mx, int my) {
         loadCoinBalanceIfNeeded();
 
@@ -2170,7 +2170,7 @@ public class PVPHubScreen extends Screen {
 
     // ── Incoming-invite overlay ──────────────────────────────────────────────
 
-    private void renderInviteOverlay(GuiGraphicsExtractor g, int px, int py, int panelW,
+    private void renderInviteOverlay(GuiGraphics g, int px, int py, int panelW,
                                       int mx, int my) {
         FriendsService f = friendsService();
         if (f == null) { inviteAcceptRect = null; inviteDeclineRect = null; return; }
@@ -2208,7 +2208,7 @@ public class PVPHubScreen extends Screen {
 
     // ── Player detail sub-view (replaces leaderboard list when active) ───────
 
-    private void renderPlayerDetailView(GuiGraphicsExtractor g, int mx, int my,
+    private void renderPlayerDetailView(GuiGraphics g, int mx, int my,
                                          int px, int y, int panelW, int panelH) {
         if (playerDetailEntry == null) return;
         loadPlayerDetailIfNeeded();
@@ -2383,7 +2383,7 @@ public class PVPHubScreen extends Screen {
         }
     }
 
-    private void renderBigBtn(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h,
+    private void renderBigBtn(GuiGraphics g, int mx, int my, int x, int y, int w, int h,
                               String label, int bg, int border) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, hover ? 0xFFFF99CC : border);
@@ -2628,7 +2628,7 @@ public class PVPHubScreen extends Screen {
             }));
     }
 
-    private void renderToggleBtn(GuiGraphicsExtractor g, int x, int y, String label, boolean active, int mx, int my) {
+    private void renderToggleBtn(GuiGraphics g, int x, int y, String label, boolean active, int mx, int my) {
         int bg = active ? 0xFF1A1A2E : 0xFF0E0E18;
         int border = active ? BORDER_COLOR : 0xFF2A2A3A;
         g.fill(x - 1, y - 1, x + 79, y + 19, border);
@@ -2637,7 +2637,7 @@ public class PVPHubScreen extends Screen {
     }
 
     /** Smaller pill button for the scope picker (Local/Region/Global), 48px wide. */
-    private void renderScopeBtn(GuiGraphicsExtractor g, int x, int y, String label, String scopeValue, int mx, int my) {
+    private void renderScopeBtn(GuiGraphics g, int x, int y, String label, String scopeValue, int mx, int my) {
         boolean active = scopeValue.equals(this.scope);
         int bg = active ? 0xFF1A1A2E : 0xFF0E0E18;
         int border = active ? BORDER_COLOR : 0xFF2A2A3A;

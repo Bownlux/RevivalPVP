@@ -5,7 +5,7 @@ package net.revivalsmp.pvp.client.render;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -58,7 +58,7 @@ public class PlayerLoadoutRenderer {
         }
     }
 
-    public void render(GuiGraphicsExtractor g, Kit kit, int x, int y, int w, int h, float mouseX, float mouseY) {
+    public void render(GuiGraphics g, Kit kit, int x, int y, int w, int h, float mouseX, float mouseY) {
         LivingEntity entity = ensureEntity();
         if (entity == null) {
             g.fill(x, y, x + w, y + h, 0xFF14141F);

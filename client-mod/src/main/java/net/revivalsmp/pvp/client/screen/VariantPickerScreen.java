@@ -7,7 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -94,7 +94,7 @@ public class VariantPickerScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         recomputeLayout();
 
         // Dim background (full screen)
@@ -120,10 +120,10 @@ public class VariantPickerScreen extends Screen {
             renderCard(g, i, cx, cy, mx, my);
         }
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
-    private void renderCard(GuiGraphicsExtractor g, int index, int x, int y, int mx, int my) {
+    private void renderCard(GuiGraphics g, int index, int x, int y, int mx, int my) {
         JsonObject v = variants.get(index);
         boolean selected = v.has("id") && v.get("id").getAsInt() == currentVariantId;
         boolean hover = mx >= x && mx < x + CARD_W && my >= y && my < y + CARD_H;

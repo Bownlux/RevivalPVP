@@ -5,7 +5,7 @@ package net.revivalsmp.pvp.client.screen;
 
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -73,7 +73,7 @@ public class AddFriendModal extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         // Fire any pending suggestion fetch.
         if (pendingFetchAt != 0L && System.currentTimeMillis() >= pendingFetchAt) {
             pendingFetchAt = 0L;
@@ -127,7 +127,7 @@ public class AddFriendModal extends Screen {
             }
         }
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
     private void fetchSuggestions(String q) {
@@ -149,7 +149,7 @@ public class AddFriendModal extends Screen {
             }));
     }
 
-    private void renderBtn(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h,
+    private void renderBtn(GuiGraphics g, int mx, int my, int x, int y, int w, int h,
                            String label, int bg, int border) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, hover ? PVPTheme.BORDER : border);

@@ -5,7 +5,7 @@ package net.revivalsmp.pvp.client.screen;
 
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -104,7 +104,7 @@ public class InfoScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         hitRects.clear();
 
         // Backdrop dim
@@ -278,10 +278,10 @@ public class InfoScreen extends Screen {
         renderTextBtn(g, mx, my, px + CARD_W - 80, py + cardH - 22, 68, 14,
             "§7Sign Out", 0xFF2A1A1A, 0xFF553333, K_SIGNOUT, 0);
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
-    private void renderTextBtn(GuiGraphicsExtractor g, int mx, int my,
+    private void renderTextBtn(GuiGraphics g, int mx, int my,
                                 int x, int y, int w, int h,
                                 String label, int bg, int border,
                                 int kind, int idx) {

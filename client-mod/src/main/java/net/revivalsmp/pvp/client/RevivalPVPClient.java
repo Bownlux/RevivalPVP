@@ -6,7 +6,7 @@ package net.revivalsmp.pvp.client;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
@@ -39,7 +39,7 @@ public class RevivalPVPClient implements ClientModInitializer {
         // Default Y, vanilla 1.21+ doesn't bind Y, so no collision. Users
         // can rebind via Options → Controls → RevivalPVP, or use the
         // pause-menu button added by PauseScreenMixin.
-        openHubKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        openHubKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.revival-pvp.open_hub",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_Y,

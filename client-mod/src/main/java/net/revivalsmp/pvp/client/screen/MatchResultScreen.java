@@ -3,7 +3,7 @@
 
 package net.revivalsmp.pvp.client.screen;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
@@ -29,7 +29,7 @@ public class MatchResultScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         if (result == null) { onClose(); return; }
 
         int cx = width / 2, cy = height / 2;
@@ -68,7 +68,7 @@ public class MatchResultScreen extends Screen {
         g.fill(px + 20, py + ph - 14, px + 20 + (int)(barW * progress), py + ph - 8, accentColor);
         g.centeredText(font, Component.literal("§7Click anywhere to dismiss"), cx, py + ph - 26, PVPTheme.TEXT_MUTED);
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
     @Override
