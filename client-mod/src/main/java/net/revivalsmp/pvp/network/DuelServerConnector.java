@@ -61,44 +61,50 @@ public class DuelServerConnector {
 
         RevivalPVPMod.LOGGER.info("Connecting to duel server: {}", address);
 
-        // Heavy diagnostic logging for SP-to-MP transition. User-reported
-        // black-screen hang on 1.21.5 even with the same Saving-screen
-        // pattern that worked on 1.21.4. Need to know where it actually
-        // stops.
         boolean inSp = mc.hasSingleplayerServer();
-        RevivalPVPMod.LOGGER.info("DBG step 1: inSp={} mc.level={} mc.screen={}",
-            inSp,
-            mc.level != null ? mc.level.dimension().location() : "<null>",
-            mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>");
 
         if (inSp) {
-            try {
-                mc.setScreen(new net.minecraft.client.gui.screens.GenericMessageScreen(
-                    net.minecraft.network.chat.Component.translatable("menu.savingLevel")));
-                RevivalPVPMod.LOGGER.info("DBG step 2: setScreen(GenericMessageScreen) done. mc.screen={}",
-                    mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>");
-            } catch (Throwable t) {
-                RevivalPVPMod.LOGGER.error("DBG step 2: setScreen threw: {}", t.toString(), t);
-            }
-        }
+            // Show Saving level screen first. ConnectScreen.startConnecting()
+            // calls mc.disconnect() synchronously to halt the SP integrated
+            // server, which blocks the render thread for several seconds —
+            // user sees a black screen unless something is already painted.
+            mc.setScreen(new net.minecraft.client.gui.screens.GenericMessageScreen(
+                net.minecraft.network.chat.Component.translatable("menu.savingLevel")));
 
-        RevivalPVPMod.LOGGER.info("DBG step 3: queueing mc.execute");
-        mc.execute(() -> {
-            RevivalPVPMod.LOGGER.info("DBG step 4: mc.execute lambda running, mc.screen={}",
-                mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>");
+            // mc.execute() from the render thread runs immediately on 1.21.5,
+            // so it doesn't actually defer anything. Use a virtual thread to
+            // sleep briefly off-thread, then mc.execute back onto the render
+            // thread for the actual connect. The sleep gives MC's render loop
+            // a chance to paint a few frames of the saving screen before the
+            // disconnect-induced freeze begins.
+            RevivalPVPMod.LOGGER.info("In SP — scheduling startConnecting after 150ms paint window");
+            Thread.ofVirtual().name("rpvp-deferred-connect").start(() -> {
+                try { Thread.sleep(150); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+                mc.execute(() -> {
+                    RevivalPVPMod.LOGGER.info("Calling startConnecting from deferred path");
+                    try {
+                        ConnectScreen.startConnecting(
+                            mc.screen, mc, ServerAddress.parseString(address),
+                            serverData, false, null);
+                    } catch (Throwable t) {
+                        RevivalPVPMod.LOGGER.error("startConnecting threw for {}: {}",
+                            address, t.toString(), t);
+                    }
+                });
+            });
+        } else {
+            // Not in SP — no integrated server shutdown to worry about, just
+            // call startConnecting directly.
             try {
-                RevivalPVPMod.LOGGER.info("DBG step 5: about to call ConnectScreen.startConnecting");
                 ConnectScreen.startConnecting(
                     mc.screen, mc, ServerAddress.parseString(address),
                     serverData, false, null);
-                RevivalPVPMod.LOGGER.info("DBG step 6: startConnecting returned, mc.screen={}",
-                    mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>");
             } catch (Throwable t) {
-                RevivalPVPMod.LOGGER.error("DBG step 6: startConnecting threw for {}: {}",
+                RevivalPVPMod.LOGGER.error("startConnecting threw for {}: {}",
                     address, t.toString(), t);
             }
-        });
-        RevivalPVPMod.LOGGER.info("DBG step 3a: mc.execute queued, returning from connectToDuelServer");
+        }
     }
 
     /**
