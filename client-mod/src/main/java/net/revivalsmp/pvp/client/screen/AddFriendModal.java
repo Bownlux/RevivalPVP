@@ -5,11 +5,9 @@ package net.revivalsmp.pvp.client.screen;
 
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.revivalsmp.pvp.client.ui.PVPTheme;
 import net.revivalsmp.pvp.matchmaking.FriendsService;
@@ -73,7 +71,7 @@ public class AddFriendModal extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         // Fire any pending suggestion fetch.
         if (pendingFetchAt != 0L && System.currentTimeMillis() >= pendingFetchAt) {
             pendingFetchAt = 0L;
@@ -93,8 +91,8 @@ public class AddFriendModal extends Screen {
         g.fill(px, py, px + pw, py + ph, PVPTheme.PANEL);
         g.fill(px, py, px + pw, py + 2, PVPTheme.BORDER);
 
-        g.centeredText(font, Component.literal("§b§lAdd Friend"), cx, py + 8, PVPTheme.TEXT);
-        g.centeredText(font, Component.literal("§7Type to search RevivalPVP players"),
+        g.drawCenteredString(font, Component.literal("§b§lAdd Friend"), cx, py + 8, PVPTheme.TEXT);
+        g.drawCenteredString(font, Component.literal("§7Type to search RevivalPVP players"),
             cx, py + 22, PVPTheme.TEXT_MUTED);
 
         // Suggestions list below the input.
@@ -105,7 +103,7 @@ public class AddFriendModal extends Screen {
             int ry = sy + i * 14;
             boolean hover = mx >= sx && mx < sx + 200 && my >= ry && my < ry + 13;
             g.fill(sx - 1, ry, sx + 201, ry + 13, hover ? 0xFF2A3A4A : 0xFF1F1F2C);
-            g.text(font, Component.literal("§7• §f" + suggestions.get(i)),
+            g.drawString(font, Component.literal("§7• §f" + suggestions.get(i)),
                 sx + 6, ry + 3, PVPTheme.TEXT, false);
             suggestionRects.add(new int[]{sx, ry, sx + 200, ry + 13});
         }
@@ -123,11 +121,11 @@ public class AddFriendModal extends Screen {
             var lines = font.split(Component.literal(status), sw);
             int sy2 = btnY - lines.size() * 10 - 4;
             for (int i = 0; i < lines.size(); i++) {
-                g.centeredText(font, lines.get(i), cx, sy2 + i * 10, statusColor);
+                g.drawCenteredString(font, lines.get(i), cx, sy2 + i * 10, statusColor);
             }
         }
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
     private void fetchSuggestions(String q) {
@@ -149,17 +147,17 @@ public class AddFriendModal extends Screen {
             }));
     }
 
-    private void renderBtn(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h,
+    private void renderBtn(GuiGraphics g, int mx, int my, int x, int y, int w, int h,
                            String label, int bg, int border) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, hover ? PVPTheme.BORDER : border);
         g.fill(x, y, x + w, y + h, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, PVPTheme.TEXT);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, PVPTheme.TEXT);
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean dbl) {
-        double mx = event.x(), my = event.y();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        double mx = mouseX, my = mouseY;
 
         // Suggestion-row click → fill the input + immediately submit.
         for (int i = 0; i < suggestionRects.size(); i++) {
@@ -182,15 +180,15 @@ public class AddFriendModal extends Screen {
             if (mx >= cx - 100 && mx < cx - 4)        { submit();              return true; }
             if (mx >= cx + 4   && mx < cx + 100)      { close();               return true; }
         }
-        return super.mouseClicked(event, dbl);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
-        int k = event.key();
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        int k = keyCode;
         if (k == GLFW.GLFW_KEY_ESCAPE) { close(); return true; }
         if (k == GLFW.GLFW_KEY_ENTER || k == GLFW.GLFW_KEY_KP_ENTER) { submit(); return true; }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private void submit() {

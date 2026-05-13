@@ -10,7 +10,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -69,9 +69,9 @@ public final class VariantItemFactory {
     private static Item lookupItem(String materialName) {
         if (materialName == null || materialName.isBlank()) return null;
         String key = materialName.toLowerCase(Locale.ROOT);
-        Identifier id;
+        ResourceLocation id;
         try {
-            id = Identifier.fromNamespaceAndPath("minecraft", key);
+            id = ResourceLocation.fromNamespaceAndPath("minecraft", key);
         } catch (Exception e) {
             return null;
         }
@@ -125,9 +125,9 @@ public final class VariantItemFactory {
             case "ARROW_INFINITE"           -> "infinity";
             default                         -> n.toLowerCase(Locale.ROOT);
         };
-        Identifier id;
+        ResourceLocation id;
         try {
-            id = Identifier.fromNamespaceAndPath("minecraft", key);
+            id = ResourceLocation.fromNamespaceAndPath("minecraft", key);
         } catch (Exception e) {
             return null;
         }

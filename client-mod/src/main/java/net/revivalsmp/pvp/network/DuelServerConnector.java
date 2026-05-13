@@ -61,14 +61,23 @@ public class DuelServerConnector {
 
         RevivalPVPMod.LOGGER.info("Connecting to duel server: {}", address);
 
-        ConnectScreen.startConnecting(
-            mc.screen,
-            mc,
-            ServerAddress.parseString(address),
-            serverData,
-            false,
-            null
-        );
+        // Show Saving level screen first so the SP integrated-server
+        // shutdown (which ConnectScreen.startConnecting does synchronously
+        // on the render thread) doesn't appear as a black-screen hang.
+        if (mc.hasSingleplayerServer()) {
+            mc.setScreen(new net.minecraft.client.gui.screens.GenericMessageScreen(
+                net.minecraft.network.chat.Component.translatable("menu.savingLevel")));
+        }
+        mc.execute(() -> {
+            try {
+                ConnectScreen.startConnecting(
+                    mc.screen, mc, ServerAddress.parseString(address),
+                    serverData, false, null);
+            } catch (Throwable t) {
+                RevivalPVPMod.LOGGER.error("startConnecting threw for {}: {}",
+                    address, t.toString(), t);
+            }
+        });
     }
 
     /**
