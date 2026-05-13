@@ -7,10 +7,10 @@
   "authors": ["RevivalSMP"],
   "contact": {
     "homepage": "https://revivalpvp.net",
-    "sources":  "https://github.com/bownlux/revivalpvpmod",
-    "issues":   "https://github.com/bownlux/revivalpvpmod/issues"
+    "sources":  "https://github.com/Bownlux/RevivalPVP",
+    "issues":   "https://github.com/Bownlux/RevivalPVP/issues"
   },
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "PolyForm-Shield-1.0.0",
   "icon": "assets/revival-pvp/icon.png",
   "environment": "client",
   "entrypoints": {
@@ -25,8 +25,5 @@
     "minecraft":    "${mod_mc_dep}",
     "java":         "${mod_java_dep}",
     "fabric-api":   "*"
-  },
-  "custom": {
-    "revival-pvp:release_name": "${release_name}"
   }
 }

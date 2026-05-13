@@ -19,7 +19,6 @@ import net.revivalsmp.pvp.client.ui.PVPTheme;
 import net.revivalsmp.pvp.client.RevivalPVPClient;
 import net.revivalsmp.pvp.kit.Kit;
 import net.revivalsmp.pvp.kit.KitLoadout;
-import net.revivalsmp.pvp.kit.KitRegistry;
 import net.revivalsmp.pvp.kit.VariantItemFactory;
 import net.revivalsmp.pvp.matchmaking.FriendsService;
 import net.revivalsmp.pvp.matchmaking.MatchmakingService;
@@ -70,10 +69,7 @@ public class PVPHubScreen extends Screen {
 
     // Queue tab layout constants.
     private static final int KIT_CARD_W = 120;
-    // Card grew to 48h to fit a "X queued · Y live" footer under the
-    // kit name. The renderKitList caller passes KIT_CARD_H as the
-    // list height, so the strip auto-resizes with this constant.
-    private static final int KIT_CARD_H = 48;
+    private static final int KIT_CARD_H = 36;
     private static final int KIT_CARD_GAP = 6;
     // Right-side 3D viewer column (spans the full content height).
     private static final int VIEWER_W = 180;
@@ -81,10 +77,8 @@ public class PVPHubScreen extends Screen {
 
     private final MatchmakingService matchmaking;
     private Tab activeTab = Tab.QUEUE;
-    private Kit selectedKit = KitRegistry.getOrPlaceholder("SWORD");
-    // Default to Unranked. Players were accidentally queueing into ranked
-    // (and burning placement matches) before they understood the system.
-    private boolean ranked = false;
+    private Kit selectedKit = Kit.SWORD;
+    private boolean ranked = true;
     /** Match scope. "local" = same source server, "region" = same geo region, "global" = anyone. */
     private String scope = "global";
     private float pulseAnim = 0f;
@@ -122,14 +116,6 @@ public class PVPHubScreen extends Screen {
     /** Last live-duels fetch timestamp; we refresh every 5s to keep the list current. */
     private long      liveDuelsFetchedAt;
 
-    /** Per-kit queue counts from /queue/status. Refreshed every 8s while the
-     *  Queue tab is visible. {@code null} = not yet fetched (kit cards
-     *  render without the count line). Map key is the kit name uppercase
-     *  (FIST/SWORD/.../CROSSBOW). */
-    private JsonObject queueStatus;
-    private boolean    queueStatusLoading;
-    private long       queueStatusFetchedAt;
-
     // Matches sub-tab state.
     private MatchesSub  matchesSub   = MatchesSub.LIVE;
     private HistoryScope historyScope = HistoryScope.SELF;
@@ -146,11 +132,11 @@ public class PVPHubScreen extends Screen {
 
     // ── Loadout editor state (Phase 2) ───────────────────────────────────────
     /** Cached fetched loadouts per kit. Value is the raw JSON returned by GET /kits/loadouts/{kit}. */
-    private final Map<Kit, JsonObject> loadoutByKit = new java.util.HashMap<>();
+    private final Map<Kit, JsonObject> loadoutByKit = new EnumMap<>(Kit.class);
     /** Per-kit loading flag so we don't issue duplicate GETs while one is in flight. */
-    private final Map<Kit, Boolean> loadoutLoading = new java.util.HashMap<>();
+    private final Map<Kit, Boolean> loadoutLoading = new EnumMap<>(Kit.class);
     /** Per-kit selected variant id (mutable: updated when the user picks something in the variant picker). */
-    private final Map<Kit, Map<String, Integer>> selectedVariantId = new java.util.HashMap<>();
+    private final Map<Kit, Map<String, Integer>> selectedVariantId = new EnumMap<>(Kit.class);
     /**
      * Per-row hit rect for click handling in the loadout editor (recomputed every frame).
      * Slot string (e.g. "HEAD") → {x1, y1, x2, y2}.
@@ -190,11 +176,6 @@ public class PVPHubScreen extends Screen {
     private JsonObject playerDetailEntry;
     private JsonObject playerDetailProfile;     // GET /sponsor/profile/{username}
     private boolean    playerDetailLoading;
-    /** All-kits rating snapshot for the detail player. Same shape as the
-     *  hub's playerRatings ({@code {ratings: {KIT: {...}, ...}}} or array).
-     *  Used to render a per-kit badge strip on the detail page. */
-    private JsonObject detailKitRatings;
-    private boolean    detailKitRatingsLoading;
     /** Captured per-frame for the back-button hit rect on the detail view. */
     private int[] detailBackRect;
     private int[] detailSponsor10Rect;
@@ -247,9 +228,6 @@ public class PVPHubScreen extends Screen {
     // ── Info icon hit rect (small (i) at title-bar right) ────────────────────
     private int[] infoIconRect;
 
-    // ── Update-available pill hit rect (only set when a newer version exists) ─
-    private int[] updatePillRect;
-
     // ── Friends-tab transient state ──────────────────────────────────────────
     /** When user clicks the unfriend ✕, we don't unfriend immediately, first
      *  click flips the button to "Confirm?" and starts the timer below. The
@@ -272,23 +250,6 @@ public class PVPHubScreen extends Screen {
     public PVPHubScreen(MatchmakingService matchmaking) {
         super(Component.literal("RevivalPVP"));
         this.matchmaking = matchmaking;
-        // Kick off a background refresh of the kit catalog. UI keeps using the
-        // disk-cached / in-memory copy in the meantime, so this just keeps the
-        // catalog current without blocking hub-open.
-        KitRegistry.refresh();
-        // First-open-per-session update check against CurseForge RSS. The
-        // banner at the top of the queue tab renders on the next frame once
-        // the response lands; null/failure leaves the banner hidden.
-        if (net.revivalsmp.pvp.network.UpdateChecker.latest() == null) {
-            net.revivalsmp.pvp.network.UpdateChecker.checkOnce();
-        }
-        // Default selection may have been built from a stale fallback Kit when
-        // the screen field initialiser ran; re-resolve once registry has had
-        // a chance to be initialised by initIfNeeded() via the refresh call.
-        if (selectedKit != null) {
-            Kit fresh = KitRegistry.get(selectedKit.name());
-            if (fresh != null) this.selectedKit = fresh;
-        }
     }
 
     /** Force the queue tab (used when match_found arrives while the hub is
@@ -329,10 +290,6 @@ public class PVPHubScreen extends Screen {
         // (i) icon, sits just left of the coin pill (or where the pill would
         // be if balance is 0). Click → InfoScreen.
         renderInfoIcon(g, px, py, panelW, mx, my);
-
-        // Update-available pill, anchored left of the (i) icon. Only renders
-        // when UpdateChecker has confirmed a newer version on CurseForge.
-        renderUpdatePill(g, mx, my);
 
         // Tab bar
         renderTabs(g, px, py + 24, panelW);
@@ -488,27 +445,20 @@ public class PVPHubScreen extends Screen {
 
     /** Horizontally scrolling kit list with [icon] Name cards and left/right arrow buttons. */
     private void renderKitList(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
-        // Kick off (or re-poll) the data fetches that the card footer
-        // depends on — both are cached + bounded so calling them every
-        // frame is cheap.
-        loadQueueStatusIfNeeded();
-        loadLiveDuelsIfNeeded();
-
-        java.util.List<Kit> kits = Kit.values();
-        int n = kits.size();
-        int totalContentW = n * KIT_CARD_W + Math.max(0, n - 1) * KIT_CARD_GAP;
+        Kit[] kits = Kit.values();
+        int totalContentW = kits.length * KIT_CARD_W + (kits.length - 1) * KIT_CARD_GAP;
         int maxScroll = Math.max(0, totalContentW - w);
         if (kitScroll < 0) kitScroll = 0;
         if (kitScroll > maxScroll) kitScroll = maxScroll;
 
         // Clip to the list area so cards don't bleed past the arrows.
         g.enableScissor(x, y, x + w, y + h);
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < kits.length; i++) {
             int cx = x + i * (KIT_CARD_W + KIT_CARD_GAP) - kitScroll;
             int cy = y;
             // Skip cards fully off-screen.
             if (cx + KIT_CARD_W < x || cx > x + w) continue;
-            renderKitCard(g, kits.get(i), cx, cy, mx, my);
+            renderKitCard(g, kits[i], cx, cy, mx, my);
         }
         g.disableScissor();
 
@@ -520,7 +470,7 @@ public class PVPHubScreen extends Screen {
     }
 
     private void renderKitCard(GuiGraphicsExtractor g, Kit kit, int x, int y, int mx, int my) {
-        boolean sel = kit != null && kit.equals(selectedKit);
+        boolean sel = kit == selectedKit;
         boolean hover = mx >= x && mx < x + KIT_CARD_W && my >= y && my < y + KIT_CARD_H;
         int border = sel ? BORDER_COLOR : (hover ? 0xFF4A4A6A : 0xFF2A2A3A);
         int fill   = sel ? 0xFF1C2C3A : (hover ? 0xFF181828 : 0xFF141420);
@@ -531,77 +481,20 @@ public class PVPHubScreen extends Screen {
         // Icon at left (16x16). On the title screen (no world joined), the
         // item registry isn't bound and `new ItemStack` throws "Components
         // not bound yet". Fail safe: render a colored placeholder square.
-        // Icon is vertically centered in the card.
         int iconX = x + 6;
         int iconY = y + (KIT_CARD_H - 16) / 2;
-        ItemStack iconStack = safeItem(kit.icon());
+        ItemStack iconStack = safeItem(kit.icon);
         if (iconStack != null) {
             g.item(iconStack, iconX, iconY);
         } else {
             g.fill(iconX, iconY, iconX + 16, iconY + 16, sel ? BORDER_COLOR : 0xFF333344);
         }
 
-        // Kit name + queue/live counts stacked on the right of the icon.
-        // Name on top, counts below in a muted color so they read as
-        // metadata rather than the primary label.
+        // Kit name to the right of the icon
         int textX = iconX + 20;
-        int nameY = y + 8;
+        int textY = y + (KIT_CARD_H - 8) / 2;
         int textColor = sel ? BORDER_COLOR : TEXT_PRIMARY;
-        g.text(font, Component.literal(kit.display()), textX, nameY, textColor, false);
-
-        // Counts footer: "X queued · Y live". Hidden on FIST? No, fist
-        // matches too. Render even when both are zero so the layout
-        // doesn't visually shift as numbers come and go.
-        int queued = queuedCountForKit(kit);
-        int live   = liveCountForKit(kit);
-        String footer = "§7" + queued + " queued §8· §7" + live + " live";
-        g.text(font, Component.literal(footer), textX, nameY + 12, TEXT_MUTED, false);
-
-        // Tiny ranked-LP hint on the third line if we know the player's
-        // tier for this kit. Card is only ~94px wide for text after the
-        // icon — enough for "BRONZE IV · 470" but not "you: UNRANKED ·
-        // 465 LP". Drop the you: prefix (line position implies "you")
-        // and the trailing "LP" (number is already the LP). Tier is
-        // 3-letter abbreviated to keep apex/diamond names from
-        // overflowing.
-        if (playerRatings != null) {
-            JsonObject row = ratingForKit(kit);
-            if (row != null && row.has("placement_done") && row.get("placement_done").getAsBoolean()) {
-                String tier = row.has("rank") && !row.get("rank").isJsonNull()
-                    ? row.get("rank").getAsString() : "";
-                String div  = row.has("division") && !row.get("division").isJsonNull()
-                    ? row.get("division").getAsString() : "";
-                int lp = row.has("lp") && !row.get("lp").isJsonNull() ? row.get("lp").getAsInt() : 0;
-                if (!tier.isBlank()) {
-                    String shortTier = abbrevTier(tier);
-                    String you = "§7" + shortTier + (div.isBlank() ? "" : " " + div)
-                                  + " §8· §7" + lp;
-                    g.text(font, Component.literal(you), textX, nameY + 24, TEXT_MUTED, false);
-                }
-            }
-        }
-    }
-
-    /** Compress tier names to 3-4 chars so the card-footer "you: tier · LP"
-     *  line fits within KIT_CARD_W. UNRANKED renders as "UNR" rather than
-     *  hiding the line entirely so players past placement-done but still
-     *  un-tiered see the same layout shape. */
-    private static String abbrevTier(String tier) {
-        if (tier == null) return "";
-        return switch (tier.toUpperCase()) {
-            case "IRON"        -> "IRN";
-            case "BRONZE"      -> "BRZ";
-            case "SILVER"      -> "SLV";
-            case "GOLD"        -> "GLD";
-            case "PLATINUM"    -> "PLT";
-            case "DIAMOND"     -> "DIA";
-            case "MASTER"      -> "MAS";
-            case "GRANDMASTER" -> "GM";
-            case "CHALLENGER"  -> "CHL";
-            case "SOVEREIGN"   -> "SOV";
-            case "UNRANKED"    -> "UNR";
-            default            -> tier;
-        };
+        g.text(font, Component.literal(kit.display), textX, textY, textColor, false);
     }
 
     private void renderArrow(GuiGraphicsExtractor g, int x, int y, String label, boolean enabled) {
@@ -794,12 +687,12 @@ public class PVPHubScreen extends Screen {
         int innerW = w - padding * 2;
 
         // Header: kit name
-        g.text(font, Component.literal("§b§l" + selectedKit.display()), innerX, innerY, TEXT_PRIMARY, false);
+        g.text(font, Component.literal("§b§l" + selectedKit.display), innerX, innerY, TEXT_PRIMARY, false);
 
         // Compact description (1 line, truncated/wrapped to fit panel width).
         int lineY = innerY + 12;
         int lineHeight = 10;
-        var descLines = font.split(Component.literal("§7" + selectedKit.description()), innerW);
+        var descLines = font.split(Component.literal("§7" + selectedKit.description), innerW);
         if (!descLines.isEmpty()) {
             g.text(font, descLines.get(0), innerX, lineY, TEXT_MUTED);
             lineY += lineHeight;
@@ -1153,15 +1046,8 @@ public class PVPHubScreen extends Screen {
             } else {
                 g.text(font, "§f" + e.get("rank_position").getAsString(),  rowX,        ry, TEXT_PRIMARY, false);
                 g.text(font, "§f" + e.get("username").getAsString(),       rowX + 28,   ry, TEXT_PRIMARY, false);
-                // Tier badge + name + division. Badge sits 1px above the
-                // text baseline so it visually centers with the row.
-                String tier = e.get("rank").getAsString();
-                String divStr = e.has("division") && !e.get("division").isJsonNull()
-                    ? e.get("division").getAsString() : "";
-                net.revivalsmp.pvp.client.render.RankBadgeRenderer.render(
-                    g, tier, rowX + 200, ry - 1, 12);
-                g.text(font, rankLegacyColor(tier) + tier + (divStr.isBlank() ? "" : " " + divStr),
-                                                                            rowX + 216,  ry, TEXT_PRIMARY, false);
+                g.text(font, "§b" + e.get("rank").getAsString() + " " + e.get("division").getAsString(),
+                                                                            rowX + 200,  ry, TEXT_PRIMARY, false);
                 g.text(font, "§e" + e.get("lp").getAsString(),              rowX + 320,  ry, TEXT_PRIMARY, false);
                 g.text(font, e.get("wins").getAsString() + "/" + e.get("games").getAsString(),
                                                                             rowX + 380,  ry, TEXT_PRIMARY, false);
@@ -1492,53 +1378,6 @@ public class PVPHubScreen extends Screen {
         return null;
     }
 
-    /** Pull the rating row for the given kit out of the detail-page rating
-     *  snapshot. Same shape as ratingForKit but operates on detailKitRatings,
-     *  which targets the leaderboard player, not the local user. */
-    private JsonObject detailRatingForKit(Kit kit) {
-        if (detailKitRatings == null || kit == null) return null;
-        if (detailKitRatings.has("ratings") && detailKitRatings.get("ratings").isJsonObject()) {
-            JsonObject byKit = detailKitRatings.getAsJsonObject("ratings");
-            if (byKit.has(kit.name()) && byKit.get(kit.name()).isJsonObject()) {
-                return byKit.getAsJsonObject(kit.name());
-            }
-        }
-        if (detailKitRatings.has("ratings") && detailKitRatings.get("ratings").isJsonArray()) {
-            JsonArray arr = detailKitRatings.getAsJsonArray("ratings");
-            for (var el : arr) {
-                if (!el.isJsonObject()) continue;
-                JsonObject row = el.getAsJsonObject();
-                if (row.has("kit") && kit.name().equalsIgnoreCase(row.get("kit").getAsString())) {
-                    return row;
-                }
-            }
-        }
-        return null;
-    }
-
-    /** Compact 4-char identifier per kit, fits under a 14px badge in the
-     *  detail page kit strip. Kept short so 9 cells fit in a typical
-     *  panelW without overlapping. */
-    private static String kitShortCode(Kit kit) {
-        if (kit == null) return "?";
-        return switch (kit.name()) {
-            case "FIST"     -> "FIST";
-            case "SWORD"    -> "SWRD";
-            case "ARCHER"   -> "ARCH";
-            case "MACE"     -> "MACE";
-            case "CRYSTAL"  -> "CRYS";
-            case "SPEAR"    -> "SPER";
-            case "TRIDENT"  -> "TRDT";
-            case "TNT"      -> "TNT";
-            case "CROSSBOW" -> "XBOW";
-            case "POTIONS"  -> "POTN";
-            case "AXE"      -> "AXE";
-            // Unknown kit added on the backend after this mod build — show the
-            // first 4 characters of the kit name as a safe fallback.
-            default         -> kit.name().length() > 4 ? kit.name().substring(0, 4) : kit.name();
-        };
-    }
-
     private static int rankColor(String rank) {
         if (rank == null) return TEXT_MUTED;
         return switch (rank.toUpperCase()) {
@@ -1684,19 +1523,18 @@ public class PVPHubScreen extends Screen {
         // Bottom divider
         g.fill(x, y + h - 1, x + w, y + h, 0xFF2A2A3A);
 
-        // Tier badge with thin ring in the tier's accent color. Pre-placement
-        // shows the IRON badge dimmed; the band itself signals UNRANKED via
-        // the amber stripe + text below.
+        // Glyph slot, 16x16 item icon with tier-colored ring.
         int glyphX = x + 8;
         int glyphY = y + 11;
-        int glyphSize = 16;
         // Ring (1px outline)
-        g.fill(glyphX - 2, glyphY - 2, glyphX + glyphSize + 2, glyphY - 1, accent);
-        g.fill(glyphX - 2, glyphY + glyphSize + 1, glyphX + glyphSize + 2, glyphY + glyphSize + 2, accent);
-        g.fill(glyphX - 2, glyphY - 2, glyphX - 1, glyphY + glyphSize + 2, accent);
-        g.fill(glyphX + glyphSize + 1, glyphY - 2, glyphX + glyphSize + 2, glyphY + glyphSize + 2, accent);
-        net.revivalsmp.pvp.client.render.RankBadgeRenderer.render(
-            g, placementDone ? rank : "UNRANKED", glyphX, glyphY, glyphSize);
+        g.fill(glyphX - 2, glyphY - 2, glyphX + 18, glyphY - 1, accent);
+        g.fill(glyphX - 2, glyphY + 17, glyphX + 18, glyphY + 18, accent);
+        g.fill(glyphX - 2, glyphY - 2, glyphX - 1, glyphY + 18, accent);
+        g.fill(glyphX + 17, glyphY - 2, glyphX + 18, glyphY + 18, accent);
+        try {
+            ItemStack icon = new ItemStack(rankIconMaterial(placementDone ? rank : "UNRANKED"));
+            g.item(icon, glyphX, glyphY);
+        } catch (Throwable ignored) {}
 
         // Text stack, to the right of the glyph
         int textX = glyphX + 24;
@@ -1959,47 +1797,6 @@ public class PVPHubScreen extends Screen {
         });
     }
 
-    /** Pulls /queue/status every 8s while the Queue tab is open so the
-     *  per-kit "X queued · Y live" footer on each kit card stays current.
-     *  Cheaper than per-card requests; one fetch updates all 9 cards. */
-    private void loadQueueStatusIfNeeded() {
-        long now = System.currentTimeMillis();
-        boolean stale = queueStatus == null || (now - queueStatusFetchedAt) > 8_000;
-        if (!stale || queueStatusLoading) return;
-        queueStatusLoading = true;
-        BackendHttpClient.queueStatus().thenAccept(resp -> {
-            net.minecraft.client.Minecraft.getInstance().execute(() -> {
-                queueStatusLoading = false;
-                queueStatusFetchedAt = System.currentTimeMillis();
-                if (resp != null) queueStatus = resp;
-            });
-        });
-    }
-
-    /** How many duels currently in progress for the given kit. Counted
-     *  from the cached liveDuels response so we don't add a second
-     *  per-kit endpoint. Returns 0 if cache empty. */
-    private int liveCountForKit(Kit kit) {
-        if (liveDuels == null || kit == null) return 0;
-        int n = 0;
-        String want = kit.name();
-        for (var el : liveDuels) {
-            if (!el.isJsonObject()) continue;
-            var obj = el.getAsJsonObject();
-            if (obj.has("kit") && want.equalsIgnoreCase(obj.get("kit").getAsString())) n++;
-        }
-        return n;
-    }
-
-    /** How many players currently in the queue for the given kit.
-     *  Reads from the cached /queue/status response. */
-    private int queuedCountForKit(Kit kit) {
-        if (queueStatus == null || kit == null) return 0;
-        if (!queueStatus.has("queues") || !queueStatus.get("queues").isJsonObject()) return 0;
-        var queues = queueStatus.getAsJsonObject("queues");
-        return queues.has(kit.name()) ? queues.get(kit.name()).getAsInt() : 0;
-    }
-
     private void renderFriendsTab(GuiGraphicsExtractor g, int mx, int my,
                                   int px, int y, int panelW, int panelH) {
         FriendsService f = friendsService();
@@ -2201,29 +1998,12 @@ public class PVPHubScreen extends Screen {
             g.fill(ax, ay, ax + asz, ay + asz, RANK_IRON);
         }
 
-        // Username (truncated to 12 chars to keep room for badge + status).
-        String uname = fr.username() == null ? "?" : fr.username();
-        if (uname.length() > 12) uname = uname.substring(0, 11) + "…";
-        g.text(font, Component.literal("§f" + uname),
+        // Username.
+        g.text(font, Component.literal("§f" + fr.username()),
             x + 20, y + 6, TEXT_PRIMARY, false);
 
-        // Rank badge + compact division/LP. Slot starts after a fixed
-        // username band (108px) so badges align across rows. Skipped if
-        // friend hasn't placed yet.
-        if (fr.kit() != null && fr.rank() != null) {
-            int badgeX = x + 108;
-            int badgeY = y + 1;
-            net.revivalsmp.pvp.client.render.RankBadgeRenderer.render(
-                g, fr.rank(), badgeX, badgeY, 14);
-            String div = fr.division();
-            String compact = (div == null || div.isBlank() ? "" : div + " ") + fr.lp() + " LP";
-            g.text(font, Component.literal(rankLegacyColor(fr.rank()) + compact),
-                badgeX + 18, y + 6, TEXT_PRIMARY, false);
-        }
-
-        // Presence dot + label, anchored relative to the action buttons so
-        // it stays put regardless of rank text length.
-        int dotX = x + w - 132;
+        // Presence dot + label.
+        int dotX = x + w - 140;
         int dotColor = switch (fr.onlineState() == null ? "" : fr.onlineState()) {
             case "idle"     -> 0xFF44CC44;
             case "in_queue" -> 0xFFCCCC44;
@@ -2239,6 +2019,14 @@ public class PVPHubScreen extends Screen {
         };
         g.text(font, Component.literal("§7" + stateLabel),
             dotX + 8, y + 6, TEXT_MUTED, false);
+
+        // Kit-rank stub if present.
+        if (fr.kit() != null && fr.rank() != null) {
+            String text = rankLegacyColor(fr.rank()) + fr.rank().substring(0, 1) + fr.rank().substring(1).toLowerCase()
+                + (fr.division() == null || fr.division().isBlank() ? "" : " " + fr.division())
+                + " §7" + fr.lp() + "LP";
+            g.text(font, Component.literal(text), x + w - 200, y + 6, TEXT_PRIMARY, false);
+        }
 
         // Buttons. Invite ALWAYS rendered, disabled (greyed) when friend
         // isn't idle. The click still registers so the user gets a clear
@@ -2336,30 +2124,6 @@ public class PVPHubScreen extends Screen {
         g.centeredText(font, Component.literal("§b§lⓘ Account"),
             x + pillW / 2, y + 3, BORDER_COLOR);
         infoIconRect = new int[]{x, y, x + pillW, y + pillH};
-    }
-
-    /** Unobtrusive "↑ Update vX.Y.Z" pill in the title bar. Only painted when
-     *  {@link net.revivalsmp.pvp.network.UpdateChecker} has confirmed a newer
-     *  version on CurseForge. Click opens the CurseForge mod page. Anchored
-     *  to the left of the (i) "Account" pill so it doesn't shift other UI. */
-    private void renderUpdatePill(GuiGraphicsExtractor g, int mx, int my) {
-        updatePillRect = null;
-        var upd = net.revivalsmp.pvp.network.UpdateChecker.latest();
-        if (upd == null || !upd.updateAvailable() || upd.pageUrl() == null) return;
-        if (infoIconRect == null) return;
-
-        String label = "§e↑ Update v" + upd.latestVersion();
-        int pillW = font.width(label) + 12;
-        int pillH = 14;
-        int x = infoIconRect[0] - pillW - 6;
-        int y = infoIconRect[1];
-        boolean hover = mx >= x && mx < x + pillW && my >= y && my < y + pillH;
-        int border = hover ? 0xFFFFEE66 : 0xFFCCCC44;
-        int fill   = hover ? 0xFF2A2A0A : 0xFF1A1A06;
-        g.fill(x - 1, y - 1, x + pillW + 1, y + pillH + 1, border);
-        g.fill(x, y, x + pillW, y + pillH, fill);
-        g.centeredText(font, Component.literal(label), x + pillW / 2, y + 3, 0xFFFFEE66);
-        updatePillRect = new int[]{x, y, x + pillW, y + pillH};
     }
 
     // ── Title-bar coin pill (♥ N) ─────────────────────────────────────────────
@@ -2497,54 +2261,19 @@ public class PVPHubScreen extends Screen {
         g.text(font, Component.literal("§7Global rank §f#" + rankPos),
             x + 40, headY + 16, TEXT_MUTED, false);
 
-        // Per-kit rank strip: 9 cells, badge + tier label + LP for every
-        // rankable kit the player has touched. Untouched kits show a dim
-        // UNRANKED badge so the strip layout stays stable.
+        // Per-kit rank line, single row pulled from leaderboardEntry (one kit only).
         int kitsY = headY + 40;
-        // Use the live catalog, filtered to rankable kits (drops MIXED).
-        // Order tracks the backend sort_order so the strip layout follows the
-        // same row layout players see in the in-game /pvp chest GUI.
-        java.util.List<Kit> kitRow = Kit.values().stream()
-            .filter(Kit::isRankable)
-            .toList();
-        int stripH = 40;
-        g.fill(x - 1, kitsY - 1, x + innerW + 1, kitsY + stripH + 1, 0xFF2A2A3A);
-        g.fill(x, kitsY, x + innerW, kitsY + stripH, 0xFF101019);
-        int cellW = kitRow.isEmpty() ? innerW : innerW / kitRow.size();
-        for (int i = 0; i < kitRow.size(); i++) {
-            int cellX = x + i * cellW;
-            int badgeX = cellX + (cellW - 14) / 2;
-            int badgeY = kitsY + 3;
-            JsonObject row = detailRatingForKit(kitRow.get(i));
-            boolean placed = row != null && row.has("placement_done")
-                && row.get("placement_done").getAsBoolean();
-            String tier = row != null && row.has("rank") && !row.get("rank").isJsonNull()
-                ? row.get("rank").getAsString() : null;
-            int kitLp  = row != null && row.has("lp") ? row.get("lp").getAsInt() : 0;
-            net.revivalsmp.pvp.client.render.RankBadgeRenderer.render(
-                g, placed && tier != null ? tier : "UNRANKED",
-                badgeX, badgeY, 14);
-            // Kit short code beneath the badge (FIST/SWRD/ARCH/MACE/CRYS/
-            // SPER/TRDT/TNT_/XBOW). Tier color when placed, muted otherwise.
-            String code = kitShortCode(kitRow.get(i));
-            int labelColor = placed && tier != null ? rankColor(tier) : TEXT_MUTED;
-            g.centeredText(font, Component.literal(
-                (placed && tier != null ? rankLegacyColor(tier) : "§8") + code),
-                cellX + cellW / 2, kitsY + 19, labelColor);
-            // LP if placed
-            if (placed && tier != null && kitLp > 0) {
-                g.centeredText(font, Component.literal("§7" + kitLp),
-                    cellX + cellW / 2, kitsY + 29, TEXT_MUTED);
-            } else {
-                g.centeredText(font, Component.literal("§8-"),
-                    cellX + cellW / 2, kitsY + 29, TEXT_MUTED);
-            }
-        }
+        String rank = optStrEntry(playerDetailEntry, "rank", "UNRANKED");
+        String div  = optStrEntry(playerDetailEntry, "division", "");
+        int lp = playerDetailEntry.has("lp") ? playerDetailEntry.get("lp").getAsInt() : 0;
+        g.text(font, Component.literal(rankLegacyColor(rank) + rank
+                + (div.isBlank() ? "" : " " + div) + " §7• §e" + lp + " LP"),
+            x, kitsY, rankColor(rank), false);
 
         // Sponsor block, pulled from /sponsor/profile. Sized dynamically to
-        // fill the space between the kit-rank strip and the sponsor buttons.
+        // fill the space between the kit-rank line and the sponsor buttons.
         int btnYReserved  = y + panelH - 28;
-        int sponsorY      = kitsY + stripH + 6;
+        int sponsorY      = kitsY + 16;
         int sponsorH      = (btnYReserved - 12) - sponsorY;
         if (sponsorH < 80) sponsorH = 80;
         g.fill(x - 1, sponsorY - 1, x + innerW + 1, sponsorY + sponsorH + 1, 0xFF2A2A3A);
@@ -2663,33 +2392,16 @@ public class PVPHubScreen extends Screen {
     }
 
     private void loadPlayerDetailIfNeeded() {
-        if (playerDetailEntry == null) return;
-        // Sponsor profile fetch.
-        if (!playerDetailLoading && playerDetailProfile == null) {
-            String identifier = optStrEntry(playerDetailEntry, "username", null);
-            if (identifier != null) {
-                playerDetailLoading = true;
-                BackendHttpClient.sponsorProfile(identifier).thenAccept(resp ->
-                    Minecraft.getInstance().execute(() -> {
-                        playerDetailLoading = false;
-                        if (resp != null) playerDetailProfile = resp;
-                    }));
-            }
-        }
-        // Per-kit ratings fetch (independent: we want the kit strip even
-        // for non-sponsors). Uses uuid since the rankings endpoint is keyed
-        // by uuid, not username.
-        if (!detailKitRatingsLoading && detailKitRatings == null) {
-            String uuid = optStrEntry(playerDetailEntry, "uuid", null);
-            if (uuid != null && !uuid.isBlank()) {
-                detailKitRatingsLoading = true;
-                BackendHttpClient.playerRatings(uuid).thenAccept(resp ->
-                    Minecraft.getInstance().execute(() -> {
-                        detailKitRatingsLoading = false;
-                        if (resp != null) detailKitRatings = resp;
-                    }));
-            }
-        }
+        if (playerDetailEntry == null || playerDetailLoading) return;
+        if (playerDetailProfile != null) return;
+        String identifier = optStrEntry(playerDetailEntry, "username", null);
+        if (identifier == null) return;
+        playerDetailLoading = true;
+        BackendHttpClient.sponsorProfile(identifier).thenAccept(resp ->
+            Minecraft.getInstance().execute(() -> {
+                playerDetailLoading = false;
+                if (resp != null) playerDetailProfile = resp;
+            }));
     }
 
     private static String optStrEntry(JsonObject o, String key, String fallback) {
@@ -2870,11 +2582,9 @@ public class PVPHubScreen extends Screen {
     }
 
     private void openPlayerDetail(JsonObject entry) {
-        playerDetailEntry        = entry;
-        playerDetailProfile      = null;
-        playerDetailLoading      = false;
-        detailKitRatings         = null;
-        detailKitRatingsLoading  = false;
+        playerDetailEntry   = entry;
+        playerDetailProfile = null;
+        playerDetailLoading = false;
         // Don't wipe skin state — skinTextureCache is keyed by uuid and will
         // either return a cached Identifier instantly or kick off a single
         // dedup'd fetch. Just reset the scroll position for the new view.
@@ -2882,10 +2592,8 @@ public class PVPHubScreen extends Screen {
     }
 
     private void closePlayerDetail() {
-        playerDetailEntry        = null;
-        playerDetailProfile      = null;
-        detailKitRatings         = null;
-        detailKitRatingsLoading  = false;
+        playerDetailEntry   = null;
+        playerDetailProfile = null;
     }
 
     private static boolean hit(int[] rect, double mx, double my) {
@@ -2954,16 +2662,6 @@ public class PVPHubScreen extends Screen {
         // ── (i) info icon → InfoScreen ───────────────────────────────────────
         if (infoIconRect != null && hit(infoIconRect, mx, my)) {
             Minecraft.getInstance().setScreen(new InfoScreen(this));
-            return true;
-        }
-
-        // ── Update-available pill → open CurseForge page ────────────────────
-        if (updatePillRect != null && hit(updatePillRect, mx, my)) {
-            var upd = net.revivalsmp.pvp.network.UpdateChecker.latest();
-            if (upd != null && upd.pageUrl() != null) {
-                try { net.minecraft.util.Util.getPlatform().openUri(java.net.URI.create(upd.pageUrl())); }
-                catch (Throwable t) { RevivalPVPMod.LOGGER.warn("openUri failed: {}", t.getMessage()); }
-            }
             return true;
         }
 
@@ -3263,9 +2961,8 @@ public class PVPHubScreen extends Screen {
             if (!inMatchFound && mx >= kitListX + kitListW + 2 - 1 && mx < kitListX + kitListW + 2 + 17 &&
                 my >= kitListY + kitListH / 2 - 8 - 1 && my < kitListY + kitListH / 2 - 8 + 17) {
                 kitScroll += KIT_CARD_W + KIT_CARD_GAP;
-                java.util.List<Kit> kits = Kit.values();
-                int n = kits.size();
-                int totalContentW = n * KIT_CARD_W + Math.max(0, n - 1) * KIT_CARD_GAP;
+                Kit[] kits = Kit.values();
+                int totalContentW = kits.length * KIT_CARD_W + (kits.length - 1) * KIT_CARD_GAP;
                 int maxScroll = Math.max(0, totalContentW - kitListW);
                 if (kitScroll > maxScroll) kitScroll = maxScroll;
                 return true;
@@ -3273,13 +2970,12 @@ public class PVPHubScreen extends Screen {
 
             // Kit card clicks (only if click is inside the list rect)
             if (!inMatchFound && mx >= kitListX && mx < kitListX + kitListW && my >= kitListY && my < kitListY + kitListH) {
-                java.util.List<Kit> kits = Kit.values();
-                for (int i = 0; i < kits.size(); i++) {
+                Kit[] kits = Kit.values();
+                for (int i = 0; i < kits.length; i++) {
                     int cx = kitListX + i * (KIT_CARD_W + KIT_CARD_GAP) - kitScroll;
                     if (mx >= cx && mx < cx + KIT_CARD_W && my >= kitListY && my < kitListY + KIT_CARD_H) {
-                        Kit clicked = kits.get(i);
-                        if (selectedKit == null || !selectedKit.equals(clicked)) loadoutScrollY = 0;
-                        selectedKit = clicked;
+                        if (selectedKit != kits[i]) loadoutScrollY = 0;
+                        selectedKit = kits[i];
                         return true;
                     }
                 }
@@ -3389,9 +3085,8 @@ public class PVPHubScreen extends Screen {
                 double delta = (sy != 0 ? sy : sx);
                 kitScroll -= (int) (delta * (KIT_CARD_W + KIT_CARD_GAP) / 2);
                 if (kitScroll < 0) kitScroll = 0;
-                java.util.List<Kit> kits = Kit.values();
-                int n = kits.size();
-                int totalContentW = n * KIT_CARD_W + Math.max(0, n - 1) * KIT_CARD_GAP;
+                Kit[] kits = Kit.values();
+                int totalContentW = kits.length * KIT_CARD_W + (kits.length - 1) * KIT_CARD_GAP;
                 int maxScroll = Math.max(0, totalContentW - kitListW);
                 if (kitScroll > maxScroll) kitScroll = maxScroll;
                 return true;

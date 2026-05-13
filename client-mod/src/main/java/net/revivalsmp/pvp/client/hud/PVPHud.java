@@ -44,7 +44,7 @@ public class PVPHud {
     private void renderQueueBadge(GuiGraphicsExtractor g, MatchmakingService ms, int x) {
         long secs = ms.queueElapsedMs() / 1000;
         String time = String.format("%02d:%02d", secs / 60, secs % 60);
-        String kit  = ms.queuedKit() != null ? ms.queuedKit().display() : "?";
+        String kit  = ms.queuedKit() != null ? ms.queuedKit().display : "?";
 
         drawBadge(g, x, HUD_Y, BADGE_W, BADGE_H, PVPTheme.WARNING);
         drawText(g, "§e⏳ " + kit + " " + time, x + 4, HUD_Y + 7, PVPTheme.TEXT);

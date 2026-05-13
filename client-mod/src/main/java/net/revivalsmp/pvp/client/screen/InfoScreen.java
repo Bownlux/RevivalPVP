@@ -68,8 +68,6 @@ public class InfoScreen extends Screen {
     private static final int K_SIGNOUT = 4;
     private static final int K_OPEN    = 5;
     private static final int K_UPDATE  = 6;
-    private static final int K_REFRESH = 7;
-    private static final int K_DISCORD = 8;
 
     private static final String[] LEGAL_LABELS = {"Terms", "Privacy", "Sponsor", "Refunds"};
     private static final String[] LEGAL_PATHS  = {
@@ -88,9 +86,9 @@ public class InfoScreen extends Screen {
     @Override
     protected void init() {
         loadMeIfNeeded();
-        // Trigger an update check the first time the screen opens. Hits the
-        // CurseForge files.rss feed asynchronously; the pill button below renders
-        // on the next frame once the response lands.
+        // Trigger an update check the first time the screen opens. Until
+        // UpdateChecker.ENABLED is true (no Modrinth release exists yet), this
+        // resolves immediately to "no update" without any network request.
         if (UpdateChecker.latest() == null) UpdateChecker.checkOnce();
     }
 
@@ -170,66 +168,25 @@ public class InfoScreen extends Screen {
             }
             rowY += 38;
 
-            // ── Sponsor coin balance (spendable) + lifetime totals ──────────
-            // Three distinct values surfaced for clarity:
-            //   1) Spendable sponsor-coin balance (what you can give right now).
-            //   2) Lifetime totals — coins purchased, sponsored, received.
-            //   3) Sponsorship USD earnings (cash payable to YOU because
-            //      others have sponsored you).
-            // Each gets its own labeled line so the heart glyph stops
-            // doing double duty for unrelated stats.
-            int coinBal       = optInt(me, "coin_balance", 0);
-            int paidBal       = optInt(me, "paid_balance", 0);
-            int freeBal       = optInt(me, "free_balance", 0);
-            int totalBought   = optInt(me, "total_purchased", 0);
-            int totalSpent    = optInt(me, "total_spent",     0);
-            int totalReceived = optInt(me, "total_received",  0);
-
-            g.text(font, Component.literal(
-                "§d♥ §f" + coinBal + " §7coins to spend"),
+            // ── Coin balance + earnings ───────────────────────────────────
+            int coinBal = optInt(me, "coin_balance", 0);
+            int paidBal = optInt(me, "paid_balance", 0);
+            g.text(font, Component.literal("§d♥ §f" + coinBal + " §7coins"),
                 px + 12, rowY, PVPTheme.TEXT, false);
             if (paidBal != coinBal) {
-                g.text(font, Component.literal("§8(" + paidBal + "p · " + freeBal + "f)"),
-                    px + 12 + font.width("♥ " + coinBal + " coins to spend ") + 4, rowY,
+                g.text(font, Component.literal("§8(" + paidBal + " paid)"),
+                    px + 12 + font.width("♥ " + coinBal + " coins ") + 6, rowY,
                     PVPTheme.TEXT_MUTED, false);
             }
-            // Click-to-refresh icon at the right edge of the coin row. Forces
-            // a fresh /auth/me fetch, useful right after a Tebex purchase
-            // when the cached `me` payload hasn't picked up the new balance.
-            int refreshX = px + CARD_W - 12 - 14;
-            renderTextBtn(g, mx, my, refreshX, rowY - 2, 14, 14,
-                meLoading ? "§7…" : "§b↻", 0xFF14202A, 0xFF66E5FF, K_REFRESH, 0);
             rowY += 12;
 
-            // Lifetime coin totals. One compact line, hidden when all three
-            // are zero (new accounts) so we don't waste vertical space.
-            // Abbreviated to keep within CARD_W on the smallest GUI scale.
-            if (totalBought > 0 || totalSpent > 0 || totalReceived > 0) {
-                String life = String.format(
-                    "§8Lifetime: §7bought §f%d §8· §7sent §f%d §8· §7got §f%d",
-                    totalBought, totalSpent, totalReceived);
-                g.text(font, Component.literal(life), px + 12, rowY, PVPTheme.TEXT_MUTED, false);
-                rowY += 12;
-            }
-
-            // ── Earnings (received from being sponsored, payable in USD) ───
-            // These dollars are NOT the coin balance above. They're cash you
-            // can withdraw because OTHER players have spent paid coins on
-            // you. "held" is the 60-day rolling window per the sponsor
-            // policy; "available" is what's past the hold and ready to
-            // request via payout. min payout threshold goes on its own
-            // line so the headline numbers fit within CARD_W.
             double avail = optDouble(me, "earnings_available", 0);
             double held  = optDouble(me, "earnings_held",      0);
             double minP  = optDouble(me, "min_payout_usd",     10);
-            String earn = String.format(
-                "§7Payouts: §a$%.2f §7avail §8· §7$%.2f held",
-                avail, held);
+            String earn = String.format("§a$%.2f §7available §8· §7$%.2f held §8· §7min $%.0f",
+                avail, held, minP);
             g.text(font, Component.literal(earn), px + 12, rowY, PVPTheme.TEXT_MUTED, false);
-            rowY += 12;
-            g.text(font, Component.literal(String.format("§8min payout $%.0f", minP)),
-                px + 12, rowY, PVPTheme.TEXT_MUTED, false);
-            rowY += 14;
+            rowY += 16;
         }
 
         // ── Web Login Code section ──────────────────────────────────────────
@@ -291,31 +248,22 @@ public class InfoScreen extends Screen {
             }
         }
 
-        // ── Legal + Discord links row ───────────────────────────────────────
+        // ── Legal links row ─────────────────────────────────────────────────
         g.fill(px + 8, rowY + 2, px + CARD_W - 8, rowY + 3, 0xFF2A2A3A);
         rowY += 8;
-        // 5 buttons (4 legal + Discord) with 6px gaps between → 4 gaps total.
-        int linkW = (CARD_W - 24 - 24) / 5;
+        int linkW = (CARD_W - 24 - 18) / 4;   // 4 links + 6px gap each
         for (int i = 0; i < LEGAL_LABELS.length; i++) {
             int lx = px + 12 + i * (linkW + 6);
             renderTextBtn(g, mx, my, lx, rowY, linkW, 14,
                 "§b" + LEGAL_LABELS[i], 0xFF14202A, 0xFF66E5FF, K_LEGAL, i);
         }
-        // Discord button — Discord brand purple, sits at the right end of
-        // the legal row. Opens the public vanity invite directly so the URL
-        // is short and game-friendly.
-        int discX = px + 12 + LEGAL_LABELS.length * (linkW + 6);
-        renderTextBtn(g, mx, my, discX, rowY, linkW, 14,
-            "§9§lDiscord", 0xFF1A1A3A, 0xFF7289DA, K_DISCORD, 0);
         rowY += 18;
 
         // ── Version + update banner ─────────────────────────────────────────
         // Always-visible footer: shows the running version and (when an
         // update is detected) a clickable "Update available" pill.
         UpdateChecker.Result upd = UpdateChecker.latest();
-        String releaseName = BuildInfo.releaseName();
-        String verLine = "§8v" + BuildInfo.version()
-            + (releaseName.isEmpty() ? "" : " §7- §f" + releaseName);
+        String verLine = "§8v" + BuildInfo.version();
         g.text(font, Component.literal(verLine), px + 12, py + cardH - 22,
             PVPTheme.TEXT_MUTED, false);
         if (upd != null && upd.updateAvailable() && upd.pageUrl() != null) {
@@ -361,16 +309,6 @@ public class InfoScreen extends Screen {
                     }
                     case K_GEN     -> requestLoginCode();
                     case K_LEGAL   -> openBrowser("https://revivalpvp.net" + LEGAL_PATHS[idx]);
-                    case K_DISCORD -> openBrowser("https://discord.gg/revival-smp");
-                    case K_REFRESH -> {
-                        // Drop the cached `me` payload and refetch. Drives
-                        // both the coin balance line and the earnings
-                        // summary back to whatever the backend currently
-                        // reports.
-                        me = null;
-                        meError = null;
-                        loadMeIfNeeded();
-                    }
                     case K_UPDATE  -> {
                         UpdateChecker.Result u = UpdateChecker.latest();
                         if (u != null && u.pageUrl() != null) openBrowser(u.pageUrl());
