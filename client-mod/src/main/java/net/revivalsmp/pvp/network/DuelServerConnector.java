@@ -61,14 +61,22 @@ public class DuelServerConnector {
 
         RevivalPVPMod.LOGGER.info("Connecting to duel server: {}", address);
 
-        ConnectScreen.startConnecting(
-            mc.screen,
-            mc,
-            ServerAddress.parseString(address),
-            serverData,
-            false,
-            null
-        );
+        try {
+            ConnectScreen.startConnecting(
+                mc.screen,
+                mc,
+                ServerAddress.parseString(address),
+                serverData,
+                false,
+                null
+            );
+            mc.execute(() -> {
+                String after = mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>";
+                RevivalPVPMod.LOGGER.info("post-startConnecting mc.screen={} (expect ConnectScreen)", after);
+            });
+        } catch (Throwable t) {
+            RevivalPVPMod.LOGGER.error("ConnectScreen.startConnecting threw for {}: {}", address, t.toString(), t);
+        }
     }
 
     /**
