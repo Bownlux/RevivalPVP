@@ -7,7 +7,10 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+// fabric-api 0.128.x (1.21.5) doesn't ship HudElementRegistry yet — it was
+// added around 0.129.x. Use the older HudRenderCallback which is in both
+// 0.128.x and 0.129.x so the same jar runs on 1.21.5 through 1.21.10.
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -54,8 +57,9 @@ public class RevivalPVPClient implements ClientModInitializer {
         // Register plugin message channels for duel server communication
         DuelServerListener.register();
 
-        HudElementRegistry.addLast(
-            ResourceLocation.fromNamespaceAndPath("revival-pvp", "hud"),
+        // Old-style HudRenderCallback works back to fabric-api 0.119+.
+        // No ID needed — first-come ordering.
+        HudRenderCallback.EVENT.register(
             (guiGraphics, deltaTracker) -> hud.render(guiGraphics, deltaTracker)
         );
 
