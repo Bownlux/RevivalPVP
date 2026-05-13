@@ -1,8 +1,13 @@
 name: release-client-mod
 
-# Triggered by a tag like `client-v1.1.0`. Builds the jar and attaches it
-# to a fresh GitHub release. The server mod has its own release workflow
-# under tag prefix `server-v*`.
+# Triggered by a tag like `client-v1.1.0` (main, MC 26.1) or
+# `client-v1.0.0-mc1.21.4` (the mc/1.21.4 branch). Builds the jar and
+# attaches it to a fresh GitHub release. The server mod has its own
+# release workflow under tag prefix `server-v*`.
+#
+# Java version is auto-detected from `client-mod/gradle.properties`
+# (java_version key) so different MC version branches can target
+# different JDKs without per-workflow forks.
 on:
   push:
     tags:
@@ -15,12 +20,17 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Read java_version from gradle.properties
+        id: javav
+        working-directory: client-mod
+        run: |
+          v=$(grep -E '^java_version=' gradle.properties | cut -d'=' -f2 | tr -d ' \r')
+          echo "Detected java_version=$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          # Matches gradle.properties java_version=25 / mod_java_dep=>=25
-          # on the main branch.
-          java-version: '25'
+          java-version: ${{ steps.javav.outputs.version }}
           cache: gradle
       - name: Make gradlew executable
         working-directory: client-mod

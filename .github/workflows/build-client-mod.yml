@@ -1,8 +1,13 @@
 name: build-client-mod
 
+# Builds the client mod on push to main + any mc/* version branch so we
+# catch breakage across all maintained MC version targets. Java version
+# is auto-detected from client-mod/gradle.properties.
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'mc/**'
     paths:
       - 'client-mod/**'
       - '.github/workflows/build-client-mod.yml'
@@ -15,13 +20,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Read java_version from gradle.properties
+        id: javav
+        working-directory: client-mod
+        run: |
+          v=$(grep -E '^java_version=' gradle.properties | cut -d'=' -f2 | tr -d ' \r')
+          echo "Detected java_version=$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          # Matches gradle.properties java_version=25 / mod_java_dep=>=25.
-          # mc/1.21.11 branch targets Java 21 — workflow on that branch
-          # should override this with 21.
-          java-version: '25'
+          java-version: ${{ steps.javav.outputs.version }}
           cache: gradle
       - name: Make gradlew executable
         working-directory: client-mod
@@ -32,6 +41,6 @@ jobs:
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
-          name: revival-pvp-mod
+          name: revival-pvp-mod-${{ github.ref_name }}
           path: client-mod/build/libs/revival-pvp-mod-*.jar
           if-no-files-found: error
