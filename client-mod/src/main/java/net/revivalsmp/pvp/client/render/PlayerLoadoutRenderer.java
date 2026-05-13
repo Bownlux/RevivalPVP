@@ -5,7 +5,7 @@ package net.revivalsmp.pvp.client.render;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -39,10 +39,8 @@ public class PlayerLoadoutRenderer {
     /** Tracks the override map identity used in the last applyKit so we re-equip on change. */
     private Map<KitLoadout.Slot, ItemStack> lastAppliedOverrides;
 
-    /** Per-kit override map. {@code null} means "no override, use KitLoadout defaults".
-     *  Keyed by Kit since Kit is now a record (equals/hashCode by all fields, but
-     *  KitRegistry returns canonical singletons so reference equality also works). */
-    private final Map<Kit, Map<KitLoadout.Slot, ItemStack>> overrides = new java.util.HashMap<>();
+    /** Per-kit override map. {@code null} means "no override, use KitLoadout defaults". */
+    private final Map<Kit, Map<KitLoadout.Slot, ItemStack>> overrides = new EnumMap<>(Kit.class);
 
     /** Hover regions for visible armor + held items. Updated each render. */
     private final Map<KitLoadout.Slot, int[]> hoverRects = new EnumMap<>(KitLoadout.Slot.class);
@@ -54,13 +52,13 @@ public class PlayerLoadoutRenderer {
     public void setSelectedVariants(Kit kit, Map<KitLoadout.Slot, ItemStack> selected) {
         if (selected == null) overrides.remove(kit);
         else overrides.put(kit, new EnumMap<>(selected));
-        if (kit != null && kit.equals(lastEquippedKit)) {
+        if (kit == lastEquippedKit) {
             // Force a re-equip on next render.
             lastEquippedKit = null;
         }
     }
 
-    public void render(GuiGraphicsExtractor g, Kit kit, int x, int y, int w, int h, float mouseX, float mouseY) {
+    public void render(GuiGraphics g, Kit kit, int x, int y, int w, int h, float mouseX, float mouseY) {
         LivingEntity entity = ensureEntity();
         if (entity == null) {
             g.fill(x, y, x + w, y + h, 0xFF14141F);
@@ -100,7 +98,7 @@ public class PlayerLoadoutRenderer {
         float virtMouseX = cx + dx;
         float virtMouseY = eyeY + dy;
 
-        InventoryScreen.extractEntityInInventoryFollowsMouse(
+        InventoryScreen.renderEntityInInventoryFollowsMouse(
             g,
             x, y, x + w, y + h,
             scale,

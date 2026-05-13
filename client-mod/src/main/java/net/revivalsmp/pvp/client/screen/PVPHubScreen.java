@@ -7,10 +7,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.revivalsmp.pvp.RevivalPVPMod;
@@ -19,7 +17,6 @@ import net.revivalsmp.pvp.client.ui.PVPTheme;
 import net.revivalsmp.pvp.client.RevivalPVPClient;
 import net.revivalsmp.pvp.kit.Kit;
 import net.revivalsmp.pvp.kit.KitLoadout;
-import net.revivalsmp.pvp.kit.KitRegistry;
 import net.revivalsmp.pvp.kit.VariantItemFactory;
 import net.revivalsmp.pvp.matchmaking.FriendsService;
 import net.revivalsmp.pvp.matchmaking.MatchmakingService;
@@ -70,10 +67,7 @@ public class PVPHubScreen extends Screen {
 
     // Queue tab layout constants.
     private static final int KIT_CARD_W = 120;
-    // Card grew to 48h to fit a "X queued · Y live" footer under the
-    // kit name. The renderKitList caller passes KIT_CARD_H as the
-    // list height, so the strip auto-resizes with this constant.
-    private static final int KIT_CARD_H = 48;
+    private static final int KIT_CARD_H = 36;
     private static final int KIT_CARD_GAP = 6;
     // Right-side 3D viewer column (spans the full content height).
     private static final int VIEWER_W = 180;
@@ -81,10 +75,8 @@ public class PVPHubScreen extends Screen {
 
     private final MatchmakingService matchmaking;
     private Tab activeTab = Tab.QUEUE;
-    private Kit selectedKit = KitRegistry.getOrPlaceholder("SWORD");
-    // Default to Unranked. Players were accidentally queueing into ranked
-    // (and burning placement matches) before they understood the system.
-    private boolean ranked = false;
+    private Kit selectedKit = Kit.SWORD;
+    private boolean ranked = true;
     /** Match scope. "local" = same source server, "region" = same geo region, "global" = anyone. */
     private String scope = "global";
     private float pulseAnim = 0f;
@@ -122,14 +114,6 @@ public class PVPHubScreen extends Screen {
     /** Last live-duels fetch timestamp; we refresh every 5s to keep the list current. */
     private long      liveDuelsFetchedAt;
 
-    /** Per-kit queue counts from /queue/status. Refreshed every 8s while the
-     *  Queue tab is visible. {@code null} = not yet fetched (kit cards
-     *  render without the count line). Map key is the kit name uppercase
-     *  (FIST/SWORD/.../CROSSBOW). */
-    private JsonObject queueStatus;
-    private boolean    queueStatusLoading;
-    private long       queueStatusFetchedAt;
-
     // Matches sub-tab state.
     private MatchesSub  matchesSub   = MatchesSub.LIVE;
     private HistoryScope historyScope = HistoryScope.SELF;
@@ -146,11 +130,11 @@ public class PVPHubScreen extends Screen {
 
     // ── Loadout editor state (Phase 2) ───────────────────────────────────────
     /** Cached fetched loadouts per kit. Value is the raw JSON returned by GET /kits/loadouts/{kit}. */
-    private final Map<Kit, JsonObject> loadoutByKit = new java.util.HashMap<>();
+    private final Map<Kit, JsonObject> loadoutByKit = new EnumMap<>(Kit.class);
     /** Per-kit loading flag so we don't issue duplicate GETs while one is in flight. */
-    private final Map<Kit, Boolean> loadoutLoading = new java.util.HashMap<>();
+    private final Map<Kit, Boolean> loadoutLoading = new EnumMap<>(Kit.class);
     /** Per-kit selected variant id (mutable: updated when the user picks something in the variant picker). */
-    private final Map<Kit, Map<String, Integer>> selectedVariantId = new java.util.HashMap<>();
+    private final Map<Kit, Map<String, Integer>> selectedVariantId = new EnumMap<>(Kit.class);
     /**
      * Per-row hit rect for click handling in the loadout editor (recomputed every frame).
      * Slot string (e.g. "HEAD") → {x1, y1, x2, y2}.
@@ -190,11 +174,6 @@ public class PVPHubScreen extends Screen {
     private JsonObject playerDetailEntry;
     private JsonObject playerDetailProfile;     // GET /sponsor/profile/{username}
     private boolean    playerDetailLoading;
-    /** All-kits rating snapshot for the detail player. Same shape as the
-     *  hub's playerRatings ({@code {ratings: {KIT: {...}, ...}}} or array).
-     *  Used to render a per-kit badge strip on the detail page. */
-    private JsonObject detailKitRatings;
-    private boolean    detailKitRatingsLoading;
     /** Captured per-frame for the back-button hit rect on the detail view. */
     private int[] detailBackRect;
     private int[] detailSponsor10Rect;
@@ -210,17 +189,17 @@ public class PVPHubScreen extends Screen {
     private long   lowBalanceMsgUntilMs;
     /** Cached skin texture for the currently-displayed detail player.
      *  Reads from skinTextureCache (LRU below) on each render. */
-    private net.minecraft.resources.Identifier detailSkinTex;
+    private net.minecraft.resources.ResourceLocation detailSkinTex;
     private String detailSkinUuid;
     /** Per-uuid skin texture cache, bounded LRU. The Mojang HTTP profile
      *  fetch is the expensive step (~200-500ms + a fair-use rate limit),
-     *  so cache the resolved Identifier across player clicks. Reopening
+     *  so cache the resolved ResourceLocation across player clicks. Reopening
      *  any previously-viewed player is instant. Bound is generous: 128
      *  entries is ~kilobytes of references, but caps cumulative growth
      *  for long sessions on busy leaderboards. */
-    private final java.util.Map<String, net.minecraft.resources.Identifier> skinTextureCache =
+    private final java.util.Map<String, net.minecraft.resources.ResourceLocation> skinTextureCache =
         java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(16, 0.75f, true) {
-            @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, net.minecraft.resources.Identifier> e) {
+            @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, net.minecraft.resources.ResourceLocation> e) {
                 return size() > 128;
             }
         });
@@ -247,9 +226,6 @@ public class PVPHubScreen extends Screen {
     // ── Info icon hit rect (small (i) at title-bar right) ────────────────────
     private int[] infoIconRect;
 
-    // ── Update-available pill hit rect (only set when a newer version exists) ─
-    private int[] updatePillRect;
-
     // ── Friends-tab transient state ──────────────────────────────────────────
     /** When user clicks the unfriend ✕, we don't unfriend immediately, first
      *  click flips the button to "Confirm?" and starts the timer below. The
@@ -272,23 +248,6 @@ public class PVPHubScreen extends Screen {
     public PVPHubScreen(MatchmakingService matchmaking) {
         super(Component.literal("RevivalPVP"));
         this.matchmaking = matchmaking;
-        // Kick off a background refresh of the kit catalog. UI keeps using the
-        // disk-cached / in-memory copy in the meantime, so this just keeps the
-        // catalog current without blocking hub-open.
-        KitRegistry.refresh();
-        // First-open-per-session update check against CurseForge RSS. The
-        // banner at the top of the queue tab renders on the next frame once
-        // the response lands; null/failure leaves the banner hidden.
-        if (net.revivalsmp.pvp.network.UpdateChecker.latest() == null) {
-            net.revivalsmp.pvp.network.UpdateChecker.checkOnce();
-        }
-        // Default selection may have been built from a stale fallback Kit when
-        // the screen field initialiser ran; re-resolve once registry has had
-        // a chance to be initialised by initIfNeeded() via the refresh call.
-        if (selectedKit != null) {
-            Kit fresh = KitRegistry.get(selectedKit.name());
-            if (fresh != null) this.selectedKit = fresh;
-        }
     }
 
     /** Force the queue tab (used when match_found arrives while the hub is
@@ -303,7 +262,7 @@ public class PVPHubScreen extends Screen {
     public boolean isPauseScreen() { return false; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         pulseAnim += delta * 0.05f;
 
         int w = width, h = height;
@@ -321,7 +280,7 @@ public class PVPHubScreen extends Screen {
         g.fill(px, py, px + panelW, py + 2, BORDER_COLOR);
 
         // Title
-        g.text(font, "§b§lRevivalPVP", px + 12, py + 8, TEXT_PRIMARY, false);
+        g.drawString(font, "§b§lRevivalPVP", px + 12, py + 8, TEXT_PRIMARY, false);
 
         // Sponsor key balance pill (top-right of title row, above tab bar).
         renderKeyBalancePill(g, px, py, panelW, mx, my);
@@ -329,10 +288,6 @@ public class PVPHubScreen extends Screen {
         // (i) icon, sits just left of the coin pill (or where the pill would
         // be if balance is 0). Click → InfoScreen.
         renderInfoIcon(g, px, py, panelW, mx, my);
-
-        // Update-available pill, anchored left of the (i) icon. Only renders
-        // when UpdateChecker has confirmed a newer version on CurseForge.
-        renderUpdatePill(g, mx, my);
 
         // Tab bar
         renderTabs(g, px, py + 24, panelW);
@@ -349,10 +304,10 @@ public class PVPHubScreen extends Screen {
         // Incoming-duel-invite overlay sits on top of any tab.
         renderInviteOverlay(g, px, py, panelW, mx, my);
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
-    private void renderTabs(GuiGraphicsExtractor g, int px, int ty, int panelW) {
+    private void renderTabs(GuiGraphics g, int px, int ty, int panelW) {
         int tabW = panelW / Tab.values().length;
         for (int i = 0; i < Tab.values().length; i++) {
             Tab tab = Tab.values()[i];
@@ -362,13 +317,13 @@ public class PVPHubScreen extends Screen {
             if (active) g.fill(tx, ty + 16, tx + tabW, ty + 18, BORDER_COLOR);
             int labelColor = active ? BORDER_COLOR : TEXT_MUTED;
             String label = tab.name().substring(0, 1) + tab.name().substring(1).toLowerCase();
-            g.centeredText(font, Component.literal(label), tx + tabW / 2, ty + 5, labelColor);
+            g.drawCenteredString(font, Component.literal(label), tx + tabW / 2, ty + 5, labelColor);
         }
     }
 
     // ---------------- Queue tab ----------------
 
-    private void renderQueueTab(GuiGraphicsExtractor g, int mx, int my, int px, int y, int panelW, int panelH) {
+    private void renderQueueTab(GuiGraphics g, int mx, int my, int px, int y, int panelW, int panelH) {
         // Layout:
         //   right column = 3D viewer + hover label + queue/accept button (stacked)
         //   left column  = ranked/scope toggles + kit list + loadout editor (full height)
@@ -443,7 +398,7 @@ public class PVPHubScreen extends Screen {
             // for ~6s above the QUEUE UP button so the user knows why their click was rejected.
             String err = matchmaking.lastErrorMessage();
             if (err != null && System.currentTimeMillis() - matchmaking.lastErrorAt() < 6000) {
-                g.centeredText(font, Component.literal("§c" + err),
+                g.drawCenteredString(font, Component.literal("§c" + err),
                     leftAreaX + leftAreaW / 2, btnY - 12, TEXT_MUTED);
             }
             renderBtn(g, btnX, btnY, 110, 22, "§a§l▶  QUEUE UP", 0xFF1A3A1A, 0xFF00CC44);
@@ -451,11 +406,11 @@ public class PVPHubScreen extends Screen {
             long secs = matchmaking.queueElapsedMs() / 1000;
             String label = String.format("§e⏳  %02d:%02d", secs / 60, secs % 60);
             renderBtn(g, btnX, btnY, 110, 22, label, 0xFF3A3A0A, 0xFFCCCC00);
-            g.centeredText(font, Component.literal("§7[click to cancel · ESC keeps queue]"),
+            g.drawCenteredString(font, Component.literal("§7[click to cancel · ESC keeps queue]"),
                 leftAreaX + leftAreaW / 2, btnY - 12, TEXT_MUTED);
         } else if (ms == MatchmakingService.State.MATCH_FOUND) {
             var m = matchmaking.activeMatch();
-            g.centeredText(font, Component.literal("§b⚔  Match found! vs §f" + m.opponentName()),
+            g.drawCenteredString(font, Component.literal("§b⚔  Match found! vs §f" + m.opponentName()),
                 leftAreaX + leftAreaW / 2, btnY - 12, TEXT_PRIMARY);
             // The map picker on the left drives the transition to CONNECTING via
             // map_selected. Until the backend locks a map in, the right-column
@@ -478,7 +433,7 @@ public class PVPHubScreen extends Screen {
             float pulse = 0.6f + 0.4f * (float) Math.sin(pulseAnim * 5);
             int alphaColor = ((int)(pulse * 255) << 24) | 0xCCCC00;
             renderBtn(g, btnX, btnY, 110, 22, "§e§l⏳ CONNECTING...", 0xFF2A2A0A, alphaColor);
-            g.centeredText(font, Component.literal("§7Transferring you to the duel server"),
+            g.drawCenteredString(font, Component.literal("§7Transferring you to the duel server"),
                 leftAreaX + leftAreaW / 2, btnY - 12, TEXT_MUTED);
         } else if (ms == MatchmakingService.State.IN_DUEL) {
             // Should auto-close, but if hub is reopened mid-duel show clear state.
@@ -487,28 +442,21 @@ public class PVPHubScreen extends Screen {
     }
 
     /** Horizontally scrolling kit list with [icon] Name cards and left/right arrow buttons. */
-    private void renderKitList(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
-        // Kick off (or re-poll) the data fetches that the card footer
-        // depends on — both are cached + bounded so calling them every
-        // frame is cheap.
-        loadQueueStatusIfNeeded();
-        loadLiveDuelsIfNeeded();
-
-        java.util.List<Kit> kits = Kit.values();
-        int n = kits.size();
-        int totalContentW = n * KIT_CARD_W + Math.max(0, n - 1) * KIT_CARD_GAP;
+    private void renderKitList(GuiGraphics g, int mx, int my, int x, int y, int w, int h) {
+        Kit[] kits = Kit.values();
+        int totalContentW = kits.length * KIT_CARD_W + (kits.length - 1) * KIT_CARD_GAP;
         int maxScroll = Math.max(0, totalContentW - w);
         if (kitScroll < 0) kitScroll = 0;
         if (kitScroll > maxScroll) kitScroll = maxScroll;
 
         // Clip to the list area so cards don't bleed past the arrows.
         g.enableScissor(x, y, x + w, y + h);
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < kits.length; i++) {
             int cx = x + i * (KIT_CARD_W + KIT_CARD_GAP) - kitScroll;
             int cy = y;
             // Skip cards fully off-screen.
             if (cx + KIT_CARD_W < x || cx > x + w) continue;
-            renderKitCard(g, kits.get(i), cx, cy, mx, my);
+            renderKitCard(g, kits[i], cx, cy, mx, my);
         }
         g.disableScissor();
 
@@ -519,8 +467,8 @@ public class PVPHubScreen extends Screen {
         renderArrow(g, x + w + 2, y + h / 2 - 8, "►", canRight);
     }
 
-    private void renderKitCard(GuiGraphicsExtractor g, Kit kit, int x, int y, int mx, int my) {
-        boolean sel = kit != null && kit.equals(selectedKit);
+    private void renderKitCard(GuiGraphics g, Kit kit, int x, int y, int mx, int my) {
+        boolean sel = kit == selectedKit;
         boolean hover = mx >= x && mx < x + KIT_CARD_W && my >= y && my < y + KIT_CARD_H;
         int border = sel ? BORDER_COLOR : (hover ? 0xFF4A4A6A : 0xFF2A2A3A);
         int fill   = sel ? 0xFF1C2C3A : (hover ? 0xFF181828 : 0xFF141420);
@@ -531,83 +479,26 @@ public class PVPHubScreen extends Screen {
         // Icon at left (16x16). On the title screen (no world joined), the
         // item registry isn't bound and `new ItemStack` throws "Components
         // not bound yet". Fail safe: render a colored placeholder square.
-        // Icon is vertically centered in the card.
         int iconX = x + 6;
         int iconY = y + (KIT_CARD_H - 16) / 2;
-        ItemStack iconStack = safeItem(kit.icon());
+        ItemStack iconStack = safeItem(kit.icon);
         if (iconStack != null) {
-            g.item(iconStack, iconX, iconY);
+            g.renderItem(iconStack, iconX, iconY);
         } else {
             g.fill(iconX, iconY, iconX + 16, iconY + 16, sel ? BORDER_COLOR : 0xFF333344);
         }
 
-        // Kit name + queue/live counts stacked on the right of the icon.
-        // Name on top, counts below in a muted color so they read as
-        // metadata rather than the primary label.
+        // Kit name to the right of the icon
         int textX = iconX + 20;
-        int nameY = y + 8;
+        int textY = y + (KIT_CARD_H - 8) / 2;
         int textColor = sel ? BORDER_COLOR : TEXT_PRIMARY;
-        g.text(font, Component.literal(kit.display()), textX, nameY, textColor, false);
-
-        // Counts footer: "X queued · Y live". Hidden on FIST? No, fist
-        // matches too. Render even when both are zero so the layout
-        // doesn't visually shift as numbers come and go.
-        int queued = queuedCountForKit(kit);
-        int live   = liveCountForKit(kit);
-        String footer = "§7" + queued + " queued §8· §7" + live + " live";
-        g.text(font, Component.literal(footer), textX, nameY + 12, TEXT_MUTED, false);
-
-        // Tiny ranked-LP hint on the third line if we know the player's
-        // tier for this kit. Card is only ~94px wide for text after the
-        // icon — enough for "BRONZE IV · 470" but not "you: UNRANKED ·
-        // 465 LP". Drop the you: prefix (line position implies "you")
-        // and the trailing "LP" (number is already the LP). Tier is
-        // 3-letter abbreviated to keep apex/diamond names from
-        // overflowing.
-        if (playerRatings != null) {
-            JsonObject row = ratingForKit(kit);
-            if (row != null && row.has("placement_done") && row.get("placement_done").getAsBoolean()) {
-                String tier = row.has("rank") && !row.get("rank").isJsonNull()
-                    ? row.get("rank").getAsString() : "";
-                String div  = row.has("division") && !row.get("division").isJsonNull()
-                    ? row.get("division").getAsString() : "";
-                int lp = row.has("lp") && !row.get("lp").isJsonNull() ? row.get("lp").getAsInt() : 0;
-                if (!tier.isBlank()) {
-                    String shortTier = abbrevTier(tier);
-                    String you = "§7" + shortTier + (div.isBlank() ? "" : " " + div)
-                                  + " §8· §7" + lp;
-                    g.text(font, Component.literal(you), textX, nameY + 24, TEXT_MUTED, false);
-                }
-            }
-        }
+        g.drawString(font, Component.literal(kit.display), textX, textY, textColor, false);
     }
 
-    /** Compress tier names to 3-4 chars so the card-footer "you: tier · LP"
-     *  line fits within KIT_CARD_W. UNRANKED renders as "UNR" rather than
-     *  hiding the line entirely so players past placement-done but still
-     *  un-tiered see the same layout shape. */
-    private static String abbrevTier(String tier) {
-        if (tier == null) return "";
-        return switch (tier.toUpperCase()) {
-            case "IRON"        -> "IRN";
-            case "BRONZE"      -> "BRZ";
-            case "SILVER"      -> "SLV";
-            case "GOLD"        -> "GLD";
-            case "PLATINUM"    -> "PLT";
-            case "DIAMOND"     -> "DIA";
-            case "MASTER"      -> "MAS";
-            case "GRANDMASTER" -> "GM";
-            case "CHALLENGER"  -> "CHL";
-            case "SOVEREIGN"   -> "SOV";
-            case "UNRANKED"    -> "UNR";
-            default            -> tier;
-        };
-    }
-
-    private void renderArrow(GuiGraphicsExtractor g, int x, int y, String label, boolean enabled) {
+    private void renderArrow(GuiGraphics g, int x, int y, String label, boolean enabled) {
         int color = enabled ? BORDER_COLOR : 0xFF333344;
         g.fill(x - 1, y - 1, x + 17, y + 17, 0xFF1A1A2A);
-        g.centeredText(font, Component.literal(label), x + 8, y + 4, color);
+        g.drawCenteredString(font, Component.literal(label), x + 8, y + 4, color);
     }
 
     /** Slot-display order. Only slots actually present in the kit's by_slot are rendered. */
@@ -641,10 +532,10 @@ public class PVPHubScreen extends Screen {
      * highlights cyan. After both players vote (or timeout), backend broadcasts
      * map_selected and the mod auto-transitions to CONNECTING.
      */
-    private static final net.minecraft.resources.Identifier MATCH_BANNER_TEX =
-        net.minecraft.resources.Identifier.fromNamespaceAndPath("revival-pvp", "textures/gui/match_banner.png");
+    private static final net.minecraft.resources.ResourceLocation MATCH_BANNER_TEX =
+        net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("revival-pvp", "textures/gui/match_banner.png");
 
-    private void renderMapPickerPanel(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
+    private void renderMapPickerPanel(GuiGraphics g, int mx, int my, int x, int y, int w, int h) {
         // Panel border
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF2A2A3A);
         // Base fill (kept as fallback if texture render fails)
@@ -662,8 +553,9 @@ public class PVPHubScreen extends Screen {
             // Setting regionW/H == textureW/H makes the full image stretch to
             // fit (renderW x renderH); the previous 10-arg variant cropped
             // instead of scaling.
-            g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                MATCH_BANNER_TEX, x, y, 0f, 0f, w, h, texW, texH, texW, texH);
+            // 1.21.4 blit signature: (renderType, tex, x, y, u, v, w, h, regionW, regionH, texW, texH).
+            // Same arg order as 1.21.6+, just RenderType::guiTextured instead of RenderPipelines.GUI_TEXTURED.
+            g.blit(net.minecraft.client.renderer.RenderType::guiTextured, MATCH_BANNER_TEX, x, y, 0f, 0f, w, h, texW, texH, texW, texH);
             // Light overlay (~40% opacity) so artwork is clearly visible
             // while text remains readable.
             g.fill(x, y, x + w, y + h, 0x66000000);
@@ -678,7 +570,7 @@ public class PVPHubScreen extends Screen {
         // Header
         var match = matchmaking.activeMatch();
         String header = "§b§lMAP VOTE";
-        g.centeredText(font, Component.literal(header), x + w / 2, y + 8, BORDER_COLOR);
+        g.drawCenteredString(font, Component.literal(header), x + w / 2, y + 8, BORDER_COLOR);
 
         // Sub-header: opponent + countdown
         long elapsedMs = matchmaking.matchFoundElapsedMs();
@@ -686,10 +578,10 @@ public class PVPHubScreen extends Screen {
         int  remaining = (int) Math.max(0, voteSecs - elapsedMs / 1000);
         String sub = "§7vs §f" + (match != null ? match.opponentName() : "?")
             + "   §8|   §7picks lock in §f" + remaining + "s";
-        g.centeredText(font, Component.literal(sub), x + w / 2, y + 22, TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal(sub), x + w / 2, y + 22, TEXT_MUTED);
 
         if (maps.isEmpty()) {
-            g.centeredText(font, Component.literal("§7Loading maps..."), x + w / 2, y + h / 2, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§7Loading maps..."), x + w / 2, y + h / 2, TEXT_MUTED);
             mapCardH = 0;
             return;
         }
@@ -738,9 +630,9 @@ public class PVPHubScreen extends Screen {
             g.fill(cx, cy, cx + cw, cy + cardH, fill);
 
             // Title
-            g.text(font, Component.literal("§f§l" + m.displayName()), cx + 12, cy + 10, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal("§f§l" + m.displayName()), cx + 12, cy + 10, TEXT_PRIMARY, false);
             // Description
-            g.text(font, Component.literal("§7" + m.description()), cx + 12, cy + 24, TEXT_MUTED, false);
+            g.drawString(font, Component.literal("§7" + m.description()), cx + 12, cy + 24, TEXT_MUTED, false);
 
             // Status pill (right side)
             String pill;
@@ -756,7 +648,7 @@ public class PVPHubScreen extends Screen {
                 pillColor = TEXT_MUTED;
             }
             int pillW = font.width(pill.replaceAll("§.", "")) + 12;
-            g.text(font, Component.literal(pill), cx + cw - pillW, cy + cardH - 14, pillColor, false);
+            g.drawString(font, Component.literal(pill), cx + cw - pillW, cy + cardH - 14, pillColor, false);
         }
         g.disableScissor();
 
@@ -777,7 +669,7 @@ public class PVPHubScreen extends Screen {
      * slot present in the current kit's by_slot, each row a clickable button that opens
      * the variant picker.
      */
-    private void renderLoadoutEditorPanel(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
+    private void renderLoadoutEditorPanel(GuiGraphics g, int mx, int my, int x, int y, int w, int h) {
         // Panel background
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF2A2A3A);
         g.fill(x, y, x + w, y + h, 0xFF141420);
@@ -794,14 +686,14 @@ public class PVPHubScreen extends Screen {
         int innerW = w - padding * 2;
 
         // Header: kit name
-        g.text(font, Component.literal("§b§l" + selectedKit.display()), innerX, innerY, TEXT_PRIMARY, false);
+        g.drawString(font, Component.literal("§b§l" + selectedKit.display), innerX, innerY, TEXT_PRIMARY, false);
 
         // Compact description (1 line, truncated/wrapped to fit panel width).
         int lineY = innerY + 12;
         int lineHeight = 10;
-        var descLines = font.split(Component.literal("§7" + selectedKit.description()), innerW);
+        var descLines = font.split(Component.literal("§7" + selectedKit.description), innerW);
         if (!descLines.isEmpty()) {
-            g.text(font, descLines.get(0), innerX, lineY, TEXT_MUTED);
+            g.drawString(font, descLines.get(0), innerX, lineY, TEXT_MUTED);
             lineY += lineHeight;
         }
 
@@ -825,14 +717,14 @@ public class PVPHubScreen extends Screen {
             String msg = Boolean.TRUE.equals(loadoutLoading.get(selectedKit))
                 ? "§7Loading loadout..."
                 : "§8(Loadout unavailable. Defaults will be used.)";
-            g.centeredText(font, Component.literal(msg), innerX + innerW / 2, rowsTop + rowsAvail / 2 - 4, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), innerX + innerW / 2, rowsTop + rowsAvail / 2 - 4, TEXT_MUTED);
             loadoutRowsTotalH = 0;
             return;
         }
 
         JsonObject bySlot = loadout.has("by_slot") ? loadout.getAsJsonObject("by_slot") : null;
         if (bySlot == null || bySlot.size() == 0) {
-            g.centeredText(font, Component.literal("§7No customizable slots for this kit yet."),
+            g.drawCenteredString(font, Component.literal("§7No customizable slots for this kit yet."),
                 innerX + innerW / 2, rowsTop + rowsAvail / 2 - 4, TEXT_MUTED);
             loadoutRowsTotalH = 0;
             return;
@@ -903,7 +795,7 @@ public class PVPHubScreen extends Screen {
         return null;
     }
 
-    private void renderLoadoutRow(GuiGraphicsExtractor g, int mx, int my,
+    private void renderLoadoutRow(GuiGraphics g, int mx, int my,
                                   String slot, JsonObject variant,
                                   int x, int y, int w, int h) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
@@ -929,7 +821,7 @@ public class PVPHubScreen extends Screen {
             }
         }
         if (icon != null && !icon.isEmpty()) {
-            g.item(icon, iconX, iconY);
+            g.renderItem(icon, iconX, iconY);
         } else {
             g.fill(iconX, iconY, iconX + 16, iconY + 16, 0xFF1F1F2C);
         }
@@ -938,7 +830,7 @@ public class PVPHubScreen extends Screen {
         int slotLabelX = iconX + 22;
         int slotLabelW = 50;
         int textY = y + (h - 8) / 2;
-        g.text(font, Component.literal("§7" + slotLabel(slot)), slotLabelX, textY, TEXT_MUTED, false);
+        g.drawString(font, Component.literal("§7" + slotLabel(slot)), slotLabelX, textY, TEXT_MUTED, false);
 
         // Variant name (white), clipped to remaining width
         int nameX = slotLabelX + slotLabelW;
@@ -947,12 +839,12 @@ public class PVPHubScreen extends Screen {
         String cleanName = stripLeadingLegacyColors(name);
         var nameLines = font.split(Component.literal("§f" + cleanName), nameMaxW);
         if (!nameLines.isEmpty()) {
-            g.text(font, nameLines.get(0), nameX, textY, TEXT_PRIMARY);
+            g.drawString(font, nameLines.get(0), nameX, textY, TEXT_PRIMARY);
         }
 
         // Right arrow indicator (clickable)
         int arrowColor = hover ? BORDER_COLOR : TEXT_MUTED;
-        g.text(font, Component.literal("§b▶"), arrowX, textY, arrowColor, false);
+        g.drawString(font, Component.literal("§b▶"), arrowX, textY, arrowColor, false);
     }
 
     private static String stripLeadingLegacyColors(String s) {
@@ -963,7 +855,7 @@ public class PVPHubScreen extends Screen {
     }
 
     /** Right content panel: 3D player figure + hovered-item label below it. */
-    private void renderPlayerViewerPanel(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h) {
+    private void renderPlayerViewerPanel(GuiGraphics g, int mx, int my, int x, int y, int w, int h) {
         // Panel background
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF2A2A3A);
         g.fill(x, y, x + w, y + h, 0xFF0E0E18);
@@ -987,9 +879,9 @@ public class PVPHubScreen extends Screen {
         if (noLevel) {
             int cx = x + w / 2;
             int cy = viewerY + viewerH / 2 - 18;
-            g.centeredText(font, Component.literal("§f§lJoin a game"), cx, cy, TEXT_PRIMARY);
-            g.centeredText(font, Component.literal("§7to see your"), cx, cy + 14, TEXT_MUTED);
-            g.centeredText(font, Component.literal("§73D character"), cx, cy + 24, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§f§lJoin a game"), cx, cy, TEXT_PRIMARY);
+            g.drawCenteredString(font, Component.literal("§7to see your"), cx, cy + 14, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§73D character"), cx, cy + 24, TEXT_MUTED);
             hoveredItem = null;
         } else {
             // Belt-and-suspenders try/catch: even with a level, the
@@ -1001,7 +893,7 @@ public class PVPHubScreen extends Screen {
             } catch (Throwable t) {
                 int cx = x + w / 2;
                 int cy = viewerY + viewerH / 2 - 6;
-                g.centeredText(font, Component.literal("§7Viewer warming up..."),
+                g.drawCenteredString(font, Component.literal("§7Viewer warming up..."),
                     cx, cy, TEXT_MUTED);
                 hoveredItem = null;
             }
@@ -1032,20 +924,20 @@ public class PVPHubScreen extends Screen {
                     }
                 }
             }
-            g.text(font, Component.literal("§b" + displayName), labelX, labelY, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal("§b" + displayName), labelX, labelY, TEXT_PRIMARY, false);
             int dy = labelY + 12;
             int lineHeight = 10;
             int maxLines = (labelH - 18) / lineHeight;
             int drawn = 0;
             for (var line : font.split(Component.literal(description == null ? "" : description), labelW)) {
                 if (drawn >= maxLines) break;
-                g.text(font, line, labelX, dy, TEXT_MUTED);
+                g.drawString(font, line, labelX, dy, TEXT_MUTED);
                 dy += lineHeight;
                 drawn++;
             }
         } else {
-            g.centeredText(font, Component.literal("§8Hover the item"), x + w / 2, labelY + 4, TEXT_MUTED);
-            g.centeredText(font, Component.literal("§8in the figure"), x + w / 2, labelY + 14, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§8Hover the item"), x + w / 2, labelY + 4, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§8in the figure"), x + w / 2, labelY + 14, TEXT_MUTED);
         }
     }
 
@@ -1064,7 +956,7 @@ public class PVPHubScreen extends Screen {
         return id;
     }
 
-    private void renderLeaderboardTab(GuiGraphicsExtractor g, int mx, int my, int px, int y, int panelW, int panelH) {
+    private void renderLeaderboardTab(GuiGraphics g, int mx, int my, int px, int y, int panelW, int panelH) {
         // Sub-view: clicked-through to a player detail. Render that instead.
         if (playerDetailEntry != null) {
             renderPlayerDetailView(g, mx, my, px, y, panelW, panelH);
@@ -1095,7 +987,7 @@ public class PVPHubScreen extends Screen {
             int fg = active ? 0xFF0A0A0F : 0xFF8888AA;
             if ("sponsors".equals(id) && !active) fg = 0xFFFF6BA8;
             g.fill(pillX, scopeY, pillX + w, scopeY + pillH, bg);
-            g.text(font, "§r" + label, pillX + 6, scopeY + 3, fg, false);
+            g.drawString(font, "§r" + label, pillX + 6, scopeY + 3, fg, false);
             lbScopeRects.add(new int[]{ pillX, scopeY, pillX + w, scopeY + pillH });
             lbScopeIds.add(id);
             pillX += w + pillGap;
@@ -1107,7 +999,7 @@ public class PVPHubScreen extends Screen {
         loadLeaderboardIfNeeded();
         if (leaderboardEntries == null) {
             String msg = leaderboardLoading ? "§7Loading leaderboard..." : "§cFailed to load leaderboard";
-            g.centeredText(font, Component.literal(msg), px + panelW / 2,
+            g.drawCenteredString(font, Component.literal(msg), px + panelW / 2,
                 bodyY + ((y + panelH) - bodyY) / 2, TEXT_MUTED);
             return;
         }
@@ -1115,7 +1007,7 @@ public class PVPHubScreen extends Screen {
             String empty = "sponsors".equals(leaderboardScope)
                 ? "§7No coins spent this season yet."
                 : "§7No ranked players in this kit yet.";
-            g.centeredText(font, Component.literal(empty), px + panelW / 2,
+            g.drawCenteredString(font, Component.literal(empty), px + panelW / 2,
                 bodyY + ((y + panelH) - bodyY) / 2, TEXT_MUTED);
             return;
         }
@@ -1124,16 +1016,16 @@ public class PVPHubScreen extends Screen {
         int rowX = px + 16, rowY = bodyY;
         boolean sponsorMode = "sponsors".equals(leaderboardScope);
         if (sponsorMode) {
-            g.text(font, "§7#",       rowX,        rowY, TEXT_MUTED, false);
-            g.text(font, "§7Player",  rowX + 28,   rowY, TEXT_MUTED, false);
-            g.text(font, "§7Coins",   rowX + 200,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7#",       rowX,        rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Player",  rowX + 28,   rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Coins",   rowX + 200,  rowY, TEXT_MUTED, false);
         } else {
-            g.text(font, "§7#",       rowX,        rowY, TEXT_MUTED, false);
-            g.text(font, "§7Player",  rowX + 28,   rowY, TEXT_MUTED, false);
-            g.text(font, "§7Rank",    rowX + 200,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7LP",      rowX + 320,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7W/L",     rowX + 380,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7Win%",    rowX + 440,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7#",       rowX,        rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Player",  rowX + 28,   rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Rank",    rowX + 200,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7LP",      rowX + 320,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7W/L",     rowX + 380,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Win%",    rowX + 440,  rowY, TEXT_MUTED, false);
         }
 
         int rowH = LB_ROW_H;
@@ -1147,32 +1039,25 @@ public class PVPHubScreen extends Screen {
             JsonObject e = leaderboardEntries.get(i).getAsJsonObject();
             int ry = rowY + 14 + i * rowH;
             if (sponsorMode) {
-                g.text(font, "§f" + e.get("rank").getAsString(),     rowX,        ry, TEXT_PRIMARY, false);
-                g.text(font, "§f" + e.get("username").getAsString(), rowX + 28,   ry, TEXT_PRIMARY, false);
-                g.text(font, "§d♥ " + e.get("coins").getAsString(),  rowX + 200,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§f" + e.get("rank").getAsString(),     rowX,        ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§f" + e.get("username").getAsString(), rowX + 28,   ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§d♥ " + e.get("coins").getAsString(),  rowX + 200,  ry, TEXT_PRIMARY, false);
             } else {
-                g.text(font, "§f" + e.get("rank_position").getAsString(),  rowX,        ry, TEXT_PRIMARY, false);
-                g.text(font, "§f" + e.get("username").getAsString(),       rowX + 28,   ry, TEXT_PRIMARY, false);
-                // Tier badge + name + division. Badge sits 1px above the
-                // text baseline so it visually centers with the row.
-                String tier = e.get("rank").getAsString();
-                String divStr = e.has("division") && !e.get("division").isJsonNull()
-                    ? e.get("division").getAsString() : "";
-                net.revivalsmp.pvp.client.render.RankBadgeRenderer.render(
-                    g, tier, rowX + 200, ry - 1, 12);
-                g.text(font, rankLegacyColor(tier) + tier + (divStr.isBlank() ? "" : " " + divStr),
-                                                                            rowX + 216,  ry, TEXT_PRIMARY, false);
-                g.text(font, "§e" + e.get("lp").getAsString(),              rowX + 320,  ry, TEXT_PRIMARY, false);
-                g.text(font, e.get("wins").getAsString() + "/" + e.get("games").getAsString(),
+                g.drawString(font, "§f" + e.get("rank_position").getAsString(),  rowX,        ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§f" + e.get("username").getAsString(),       rowX + 28,   ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§b" + e.get("rank").getAsString() + " " + e.get("division").getAsString(),
+                                                                            rowX + 200,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§e" + e.get("lp").getAsString(),              rowX + 320,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, e.get("wins").getAsString() + "/" + e.get("games").getAsString(),
                                                                             rowX + 380,  ry, TEXT_PRIMARY, false);
-                g.text(font, e.get("win_rate").getAsString() + "%",         rowX + 440,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, e.get("win_rate").getAsString() + "%",         rowX + 440,  ry, TEXT_PRIMARY, false);
             }
         }
     }
 
     // ── Matches tab: Live + History ──────────────────────────────────────────
 
-    private void renderMatchesTab(GuiGraphicsExtractor g, int mx, int my, int px, int y, int panelW, int panelH) {
+    private void renderMatchesTab(GuiGraphics g, int mx, int my, int px, int y, int panelW, int panelH) {
         // Sub-tab header, two pill buttons LIVE | HISTORY
         int subY = y + 8;
         renderSubTab(g, px + 16, subY, "Live Duels", matchesSub == MatchesSub.LIVE, mx, my);
@@ -1200,14 +1085,14 @@ public class PVPHubScreen extends Screen {
     }
 
     /** Top-of-tab pill button used for Live/History + Self/Everyone toggles. */
-    private void renderSubTab(GuiGraphicsExtractor g, int x, int y, String label,
+    private void renderSubTab(GuiGraphics g, int x, int y, String label,
                               boolean active, int mx, int my) {
         int w = label.equals("Live Duels") ? 88 : (label.equals("History") ? 60 : 70);
         int bg     = active ? 0xFF1A2A3A : 0xFF0E0E18;
         int border = active ? BORDER_COLOR : 0xFF2A2A3A;
         g.fill(x - 1, y - 1, x + w + 1, y + 19, border);
         g.fill(x, y, x + w, y + 18, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + 5,
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + 5,
             active ? BORDER_COLOR : TEXT_MUTED);
     }
     /** Captured during render; consumed by mouseClicked for sub-tab clicks. */
@@ -1216,7 +1101,7 @@ public class PVPHubScreen extends Screen {
     /** Refresh-button hit rect (Live Duels). Set each render in renderLiveDuels. */
     private int liveRefreshX, liveRefreshY, liveRefreshW, liveRefreshH;
 
-    private void renderLiveDuels(GuiGraphicsExtractor g, int mx, int my, int px, int y, int panelW, int panelH) {
+    private void renderLiveDuels(GuiGraphics g, int mx, int my, int px, int y, int panelW, int panelH) {
         // Refresh button, top-right of the Live Duels area. CD is implicit
         // (the cache TTL on liveDuelsFetchedAt). Click forces an immediate
         // refetch instead of waiting for the 5s auto-refresh.
@@ -1231,17 +1116,17 @@ public class PVPHubScreen extends Screen {
         g.fill(btnX - 1, btnY - 1, btnX + btnW + 1, btnY + btnH + 1, border);
         g.fill(btnX, btnY, btnX + btnW, btnY + btnH, fill);
         String label = canRefresh ? "§b⟲ REFRESH" : "§8⟲ ...";
-        g.centeredText(font, Component.literal(label), btnX + btnW / 2, btnY + 3,
+        g.drawCenteredString(font, Component.literal(label), btnX + btnW / 2, btnY + 3,
             canRefresh ? BORDER_COLOR : TEXT_MUTED);
         liveRefreshX = btnX; liveRefreshY = btnY; liveRefreshW = btnW; liveRefreshH = btnH;
         loadLiveDuelsIfNeeded();
         if (liveDuels == null) {
             String msg = liveDuelsLoading ? "§7Loading live duels..." : "§cFailed to load live duels.";
-            g.centeredText(font, Component.literal(msg), px + panelW / 2, y + panelH / 2, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), px + panelW / 2, y + panelH / 2, TEXT_MUTED);
             return;
         }
         if (liveDuels.isEmpty()) {
-            g.centeredText(font, Component.literal("§7No live duels right now, queue up to start one!"),
+            g.drawCenteredString(font, Component.literal("§7No live duels right now, queue up to start one!"),
                 px + panelW / 2, y + panelH / 2, TEXT_MUTED);
             return;
         }
@@ -1257,11 +1142,11 @@ public class PVPHubScreen extends Screen {
         int cPhase   = (int)(innerW * 0.72);
         int cSpec    = (int)(innerW * 0.86);
 
-        g.text(font, "§7Players",  rowX + cPlayers, rowY, TEXT_MUTED, false);
-        g.text(font, "§7Kit",      rowX + cKit,     rowY, TEXT_MUTED, false);
-        g.text(font, "§7M",        rowX + cMode,    rowY, TEXT_MUTED, false);
-        g.text(font, "§7Map",      rowX + cMap,     rowY, TEXT_MUTED, false);
-        g.text(font, "§7Phase",    rowX + cPhase,   rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7Players",  rowX + cPlayers, rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7Kit",      rowX + cKit,     rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7M",        rowX + cMode,    rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7Map",      rowX + cMap,     rowY, TEXT_MUTED, false);
+        g.drawString(font, "§7Phase",    rowX + cPhase,   rowY, TEXT_MUTED, false);
 
         // Capture row hit-rects for click-to-spectate. Cleared each frame.
         spectateRowRects.clear();
@@ -1281,12 +1166,12 @@ public class PVPHubScreen extends Screen {
             String phase = m.has("phase") ? m.get("phase").getAsString() : "?";
 
             int ry = rowY + 14 + i * rowH;
-            g.text(font, "§f" + a + " §7vs §f" + b,           rowX + cPlayers, ry + 2, TEXT_PRIMARY, false);
-            g.text(font, "§b" + kit,                           rowX + cKit,     ry + 2, TEXT_PRIMARY, false);
-            g.text(font, ranked ? "§e§l[R]" : "§7§l[U]",        rowX + cMode,    ry + 2, TEXT_PRIMARY, false);
-            g.text(font, "§7" + map,                           rowX + cMap,     ry + 2, TEXT_PRIMARY, false);
+            g.drawString(font, "§f" + a + " §7vs §f" + b,           rowX + cPlayers, ry + 2, TEXT_PRIMARY, false);
+            g.drawString(font, "§b" + kit,                           rowX + cKit,     ry + 2, TEXT_PRIMARY, false);
+            g.drawString(font, ranked ? "§e§l[R]" : "§7§l[U]",        rowX + cMode,    ry + 2, TEXT_PRIMARY, false);
+            g.drawString(font, "§7" + map,                           rowX + cMap,     ry + 2, TEXT_PRIMARY, false);
             int phaseColor = "active".equals(phase) ? 0xFF66E099 : 0xFFFFC85A;
-            g.text(font, phase.toUpperCase(),                  rowX + cPhase,   ry + 2, phaseColor, false);
+            g.drawString(font, phase.toUpperCase(),                  rowX + cPhase,   ry + 2, phaseColor, false);
 
             // Spectate pill, only enabled for active duels (vote-phase duels
             // can't be entered yet; the plugin would kick).
@@ -1301,18 +1186,18 @@ public class PVPHubScreen extends Screen {
             g.fill(specX - 1, specY - 1, specX + specW + 1, specY + specH + 1, specBorder);
             g.fill(specX, specY, specX + specW, specY + specH, specFill);
             String specLabel = active ? "§b§lSPECTATE" : "§8--";
-            g.centeredText(font, Component.literal(specLabel), specX + specW / 2, specY + 2,
+            g.drawCenteredString(font, Component.literal(specLabel), specX + specW / 2, specY + 2,
                 active ? BORDER_COLOR : TEXT_MUTED);
             if (active && matchId != null) {
                 spectateRowRects.add(new int[]{specX, specY, specX + specW, specY + specH});
                 spectateMatchIds.add(matchId);
             }
         }
-        g.text(font, "§8Click §bSPECTATE§8 to watch a live duel, /spectatequit to leave.",
+        g.drawString(font, "§8Click §bSPECTATE§8 to watch a live duel, /spectatequit to leave.",
             rowX, y + panelH - 10, TEXT_MUTED, false);
     }
 
-    private void renderHistory(GuiGraphicsExtractor g, int px, int y, int panelW, int panelH) {
+    private void renderHistory(GuiGraphics g, int px, int y, int panelW, int panelH) {
         loadHistoryIfNeeded();
         if (historyEntries == null) {
             String msg = null;
@@ -1333,10 +1218,10 @@ public class PVPHubScreen extends Screen {
             } else {
                 msg = "§cFailed to load history.";
             }
-            g.centeredText(font, Component.literal(msg),
+            g.drawCenteredString(font, Component.literal(msg),
                 px + panelW / 2, y + panelH / 2 - (hint != null ? 6 : 0), TEXT_MUTED);
             if (hint != null) {
-                g.centeredText(font, Component.literal(hint),
+                g.drawCenteredString(font, Component.literal(hint),
                     px + panelW / 2, y + panelH / 2 + 6, TEXT_MUTED);
             }
             return;
@@ -1345,7 +1230,7 @@ public class PVPHubScreen extends Screen {
             String msg = historyScope == HistoryScope.SELF
                 ? "§7No matches yet, queue up to play your first duel!"
                 : "§7No matches recorded yet on this server.";
-            g.centeredText(font, Component.literal(msg), px + panelW / 2, y + panelH / 2, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), px + panelW / 2, y + panelH / 2, TEXT_MUTED);
             return;
         }
 
@@ -1365,11 +1250,11 @@ public class PVPHubScreen extends Screen {
             int cMode   = (int)(innerW * 0.34);
             int cLp     = (int)(innerW * 0.55);
             int cWhen   = (int)(innerW * 0.68);
-            g.text(font, "§7Result", rowX + cResult, rowY, TEXT_MUTED, false);
-            g.text(font, "§7Kit",    rowX + cKit,    rowY, TEXT_MUTED, false);
-            g.text(font, "§7Mode",   rowX + cMode,   rowY, TEXT_MUTED, false);
-            g.text(font, "§7LP",     rowX + cLp,     rowY, TEXT_MUTED, false);
-            g.text(font, "§7When",   rowX + cWhen,   rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Result", rowX + cResult, rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Kit",    rowX + cKit,    rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Mode",   rowX + cMode,   rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7LP",     rowX + cLp,     rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7When",   rowX + cWhen,   rowY, TEXT_MUTED, false);
 
             for (int i = 0; i < n; i++) {
                 JsonObject m = historyEntries.get(i).getAsJsonObject();
@@ -1384,11 +1269,11 @@ public class PVPHubScreen extends Screen {
                 int lp = won
                     ? (m.has("lp_change_winner") && !m.get("lp_change_winner").isJsonNull() ? m.get("lp_change_winner").getAsInt() : 0)
                     : (m.has("lp_change_loser")  && !m.get("lp_change_loser").isJsonNull()  ? m.get("lp_change_loser").getAsInt()  : 0);
-                g.text(font, won ? "§a§lWIN" : "§c§lLOSS",   rowX + cResult, ry, TEXT_PRIMARY, false);
-                g.text(font, "§f" + kit,                     rowX + cKit,    ry, TEXT_PRIMARY, false);
-                g.text(font, "§7" + mode,                    rowX + cMode,   ry, TEXT_PRIMARY, false);
-                g.text(font, (lp >= 0 ? "§a+" : "§c") + lp,  rowX + cLp,     ry, TEXT_PRIMARY, false);
-                g.text(font, "§7" + when,                    rowX + cWhen,   ry, TEXT_PRIMARY, false);
+                g.drawString(font, won ? "§a§lWIN" : "§c§lLOSS",   rowX + cResult, ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§f" + kit,                     rowX + cKit,    ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§7" + mode,                    rowX + cMode,   ry, TEXT_PRIMARY, false);
+                g.drawString(font, (lp >= 0 ? "§a+" : "§c") + lp,  rowX + cLp,     ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§7" + when,                    rowX + cWhen,   ry, TEXT_PRIMARY, false);
             }
         } else {
             int cWin    = 0;
@@ -1396,11 +1281,11 @@ public class PVPHubScreen extends Screen {
             int cKit    = (int)(innerW * 0.42);
             int cMode   = (int)(innerW * 0.55);
             int cWhen   = (int)(innerW * 0.70);
-            g.text(font, "§7Winner",   rowX + cWin,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7vs Loser", rowX + cLose, rowY, TEXT_MUTED, false);
-            g.text(font, "§7Kit",      rowX + cKit,  rowY, TEXT_MUTED, false);
-            g.text(font, "§7Mode",     rowX + cMode, rowY, TEXT_MUTED, false);
-            g.text(font, "§7When",     rowX + cWhen, rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Winner",   rowX + cWin,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7vs Loser", rowX + cLose, rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Kit",      rowX + cKit,  rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7Mode",     rowX + cMode, rowY, TEXT_MUTED, false);
+            g.drawString(font, "§7When",     rowX + cWhen, rowY, TEXT_MUTED, false);
 
             for (int i = 0; i < n; i++) {
                 JsonObject m = historyEntries.get(i).getAsJsonObject();
@@ -1413,11 +1298,11 @@ public class PVPHubScreen extends Screen {
                     ? m.get("winner_name").getAsString() : "?";
                 String ln = m.has("loser_name") && !m.get("loser_name").isJsonNull()
                     ? m.get("loser_name").getAsString() : "?";
-                g.text(font, "§a" + wn,    rowX + cWin,  ry, TEXT_PRIMARY, false);
-                g.text(font, "§c" + ln,    rowX + cLose, ry, TEXT_PRIMARY, false);
-                g.text(font, "§b" + kit,   rowX + cKit,  ry, TEXT_PRIMARY, false);
-                g.text(font, "§7" + mode,  rowX + cMode, ry, TEXT_PRIMARY, false);
-                g.text(font, "§7" + when,  rowX + cWhen, ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§a" + wn,    rowX + cWin,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§c" + ln,    rowX + cLose, ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§b" + kit,   rowX + cKit,  ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§7" + mode,  rowX + cMode, ry, TEXT_PRIMARY, false);
+                g.drawString(font, "§7" + when,  rowX + cWhen, ry, TEXT_PRIMARY, false);
             }
         }
     }
@@ -1492,53 +1377,6 @@ public class PVPHubScreen extends Screen {
         return null;
     }
 
-    /** Pull the rating row for the given kit out of the detail-page rating
-     *  snapshot. Same shape as ratingForKit but operates on detailKitRatings,
-     *  which targets the leaderboard player, not the local user. */
-    private JsonObject detailRatingForKit(Kit kit) {
-        if (detailKitRatings == null || kit == null) return null;
-        if (detailKitRatings.has("ratings") && detailKitRatings.get("ratings").isJsonObject()) {
-            JsonObject byKit = detailKitRatings.getAsJsonObject("ratings");
-            if (byKit.has(kit.name()) && byKit.get(kit.name()).isJsonObject()) {
-                return byKit.getAsJsonObject(kit.name());
-            }
-        }
-        if (detailKitRatings.has("ratings") && detailKitRatings.get("ratings").isJsonArray()) {
-            JsonArray arr = detailKitRatings.getAsJsonArray("ratings");
-            for (var el : arr) {
-                if (!el.isJsonObject()) continue;
-                JsonObject row = el.getAsJsonObject();
-                if (row.has("kit") && kit.name().equalsIgnoreCase(row.get("kit").getAsString())) {
-                    return row;
-                }
-            }
-        }
-        return null;
-    }
-
-    /** Compact 4-char identifier per kit, fits under a 14px badge in the
-     *  detail page kit strip. Kept short so 9 cells fit in a typical
-     *  panelW without overlapping. */
-    private static String kitShortCode(Kit kit) {
-        if (kit == null) return "?";
-        return switch (kit.name()) {
-            case "FIST"     -> "FIST";
-            case "SWORD"    -> "SWRD";
-            case "ARCHER"   -> "ARCH";
-            case "MACE"     -> "MACE";
-            case "CRYSTAL"  -> "CRYS";
-            case "SPEAR"    -> "SPER";
-            case "TRIDENT"  -> "TRDT";
-            case "TNT"      -> "TNT";
-            case "CROSSBOW" -> "XBOW";
-            case "POTIONS"  -> "POTN";
-            case "AXE"      -> "AXE";
-            // Unknown kit added on the backend after this mod build — show the
-            // first 4 characters of the kit name as a safe fallback.
-            default         -> kit.name().length() > 4 ? kit.name().substring(0, 4) : kit.name();
-        };
-    }
-
     private static int rankColor(String rank) {
         if (rank == null) return TEXT_MUTED;
         return switch (rank.toUpperCase()) {
@@ -1593,7 +1431,7 @@ public class PVPHubScreen extends Screen {
 
     // ── F1: Placement progress pill (above kit list) ─────────────────────────
 
-    private void renderPlacementPill(GuiGraphicsExtractor g, int x, int y, int w, int h) {
+    private void renderPlacementPill(GuiGraphics g, int x, int y, int w, int h) {
         loadPlayerRatingsIfNeeded();
 
         // Background + 1px border. Border accents amber while in placement to
@@ -1607,11 +1445,11 @@ public class PVPHubScreen extends Screen {
 
         if (playerRatings == null) {
             String msg = playerRatingsLoading ? "§8Loading placements..." : "§8No rating data";
-            g.centeredText(font, Component.literal(msg), x + w / 2, y + 3, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), x + w / 2, y + 3, TEXT_MUTED);
             return;
         }
         if (row == null) {
-            g.centeredText(font, Component.literal("§8No data for " + selectedKit.name()), x + w / 2, y + 3, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal("§8No data for " + selectedKit.name()), x + w / 2, y + 3, TEXT_MUTED);
             return;
         }
 
@@ -1622,7 +1460,7 @@ public class PVPHubScreen extends Screen {
             int lp = row.has("lp") && !row.get("lp").isJsonNull() ? row.get("lp").getAsInt() : 0;
             String line = "§7Placed.  §fCurrent: " + rankLegacyColor(rank) + rank + (division.isBlank() ? "" : " " + division)
                 + " §7• §e" + lp + " LP";
-            g.text(font, Component.literal(line), x + 6, y + 3, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal(line), x + 6, y + 3, TEXT_PRIMARY, false);
             return;
         }
 
@@ -1631,7 +1469,7 @@ public class PVPHubScreen extends Screen {
         int wins   = row.has("placement_wins") ? row.get("placement_wins").getAsInt() : 0;
 
         // Left-aligned label
-        g.text(font, Component.literal("§7Placements:"), x + 6, y + 3, TEXT_MUTED, false);
+        g.drawString(font, Component.literal("§7Placements:"), x + 6, y + 3, TEXT_MUTED, false);
 
         // 10-segment bar, each segment 8px wide with 1px gap. Total ~89px.
         int barX = x + 64;
@@ -1647,12 +1485,12 @@ public class PVPHubScreen extends Screen {
         // Right-aligned text "X/10  • W: Y"
         String stat = "§f" + played + "§7/§f10  §8•  §7W: §a" + wins;
         int statW = font.width(stat.replaceAll("§.", ""));
-        g.text(font, Component.literal(stat), x + w - statW - 6, y + 3, TEXT_PRIMARY, false);
+        g.drawString(font, Component.literal(stat), x + w - statW - 6, y + 3, TEXT_PRIMARY, false);
     }
 
     // ── F2: Rank band above the 3D viewer ────────────────────────────────────
 
-    private void renderRankBand(GuiGraphicsExtractor g, int x, int y, int w, int h) {
+    private void renderRankBand(GuiGraphics g, int x, int y, int w, int h) {
         loadPlayerRatingsIfNeeded();
 
         // Background + tier-colored top stripe (resolved once row is fetched).
@@ -1662,7 +1500,7 @@ public class PVPHubScreen extends Screen {
             int accent = playerRatingsLoading ? TEXT_MUTED : RANK_AMBER;
             g.fill(x, y, x + w, y + 2, accent);
             String msg = playerRatingsLoading ? "§7Loading rank..." : "§7No rating data";
-            g.centeredText(font, Component.literal(msg), x + w / 2, y + 14, TEXT_MUTED);
+            g.drawCenteredString(font, Component.literal(msg), x + w / 2, y + 14, TEXT_MUTED);
             // Bottom divider
             g.fill(x, y + h - 1, x + w, y + h, 0xFF2A2A3A);
             return;
@@ -1684,30 +1522,29 @@ public class PVPHubScreen extends Screen {
         // Bottom divider
         g.fill(x, y + h - 1, x + w, y + h, 0xFF2A2A3A);
 
-        // Tier badge with thin ring in the tier's accent color. Pre-placement
-        // shows the IRON badge dimmed; the band itself signals UNRANKED via
-        // the amber stripe + text below.
+        // Glyph slot, 16x16 item icon with tier-colored ring.
         int glyphX = x + 8;
         int glyphY = y + 11;
-        int glyphSize = 16;
         // Ring (1px outline)
-        g.fill(glyphX - 2, glyphY - 2, glyphX + glyphSize + 2, glyphY - 1, accent);
-        g.fill(glyphX - 2, glyphY + glyphSize + 1, glyphX + glyphSize + 2, glyphY + glyphSize + 2, accent);
-        g.fill(glyphX - 2, glyphY - 2, glyphX - 1, glyphY + glyphSize + 2, accent);
-        g.fill(glyphX + glyphSize + 1, glyphY - 2, glyphX + glyphSize + 2, glyphY + glyphSize + 2, accent);
-        net.revivalsmp.pvp.client.render.RankBadgeRenderer.render(
-            g, placementDone ? rank : "UNRANKED", glyphX, glyphY, glyphSize);
+        g.fill(glyphX - 2, glyphY - 2, glyphX + 18, glyphY - 1, accent);
+        g.fill(glyphX - 2, glyphY + 17, glyphX + 18, glyphY + 18, accent);
+        g.fill(glyphX - 2, glyphY - 2, glyphX - 1, glyphY + 18, accent);
+        g.fill(glyphX + 17, glyphY - 2, glyphX + 18, glyphY + 18, accent);
+        try {
+            ItemStack icon = new ItemStack(rankIconMaterial(placementDone ? rank : "UNRANKED"));
+            g.renderItem(icon, glyphX, glyphY);
+        } catch (Throwable ignored) {}
 
         // Text stack, to the right of the glyph
         int textX = glyphX + 24;
         if (placementDone) {
             String line1 = "§l" + rankLegacyColor(rank) + rank.toUpperCase() + (division.isBlank() ? "" : " " + division);
-            g.text(font, Component.literal(line1), textX, y + 8, rankColor(rank), false);
+            g.drawString(font, Component.literal(line1), textX, y + 8, rankColor(rank), false);
             String line2 = "§7" + lp + " LP §8• §7" + wins + "W / " + played + "G";
-            g.text(font, Component.literal(line2), textX, y + 22, TEXT_MUTED, false);
+            g.drawString(font, Component.literal(line2), textX, y + 22, TEXT_MUTED, false);
         } else {
-            g.text(font, Component.literal("§7§lUNRANKED"), textX, y + 8, TEXT_MUTED, false);
-            g.text(font, Component.literal("§7Placement §f" + played + "§7/§f10"), textX, y + 22, TEXT_MUTED, false);
+            g.drawString(font, Component.literal("§7§lUNRANKED"), textX, y + 8, TEXT_MUTED, false);
+            g.drawString(font, Component.literal("§7Placement §f" + played + "§7/§f10"), textX, y + 22, TEXT_MUTED, false);
         }
 
         // Right-side division pips (or apex bar)
@@ -1959,52 +1796,11 @@ public class PVPHubScreen extends Screen {
         });
     }
 
-    /** Pulls /queue/status every 8s while the Queue tab is open so the
-     *  per-kit "X queued · Y live" footer on each kit card stays current.
-     *  Cheaper than per-card requests; one fetch updates all 9 cards. */
-    private void loadQueueStatusIfNeeded() {
-        long now = System.currentTimeMillis();
-        boolean stale = queueStatus == null || (now - queueStatusFetchedAt) > 8_000;
-        if (!stale || queueStatusLoading) return;
-        queueStatusLoading = true;
-        BackendHttpClient.queueStatus().thenAccept(resp -> {
-            net.minecraft.client.Minecraft.getInstance().execute(() -> {
-                queueStatusLoading = false;
-                queueStatusFetchedAt = System.currentTimeMillis();
-                if (resp != null) queueStatus = resp;
-            });
-        });
-    }
-
-    /** How many duels currently in progress for the given kit. Counted
-     *  from the cached liveDuels response so we don't add a second
-     *  per-kit endpoint. Returns 0 if cache empty. */
-    private int liveCountForKit(Kit kit) {
-        if (liveDuels == null || kit == null) return 0;
-        int n = 0;
-        String want = kit.name();
-        for (var el : liveDuels) {
-            if (!el.isJsonObject()) continue;
-            var obj = el.getAsJsonObject();
-            if (obj.has("kit") && want.equalsIgnoreCase(obj.get("kit").getAsString())) n++;
-        }
-        return n;
-    }
-
-    /** How many players currently in the queue for the given kit.
-     *  Reads from the cached /queue/status response. */
-    private int queuedCountForKit(Kit kit) {
-        if (queueStatus == null || kit == null) return 0;
-        if (!queueStatus.has("queues") || !queueStatus.get("queues").isJsonObject()) return 0;
-        var queues = queueStatus.getAsJsonObject("queues");
-        return queues.has(kit.name()) ? queues.get(kit.name()).getAsInt() : 0;
-    }
-
-    private void renderFriendsTab(GuiGraphicsExtractor g, int mx, int my,
+    private void renderFriendsTab(GuiGraphics g, int mx, int my,
                                   int px, int y, int panelW, int panelH) {
         FriendsService f = friendsService();
         if (f == null) {
-            g.centeredText(font, Component.literal("§7Friends service unavailable"),
+            g.drawCenteredString(font, Component.literal("§7Friends service unavailable"),
                 px + panelW / 2, y + panelH / 2, TEXT_MUTED);
             return;
         }
@@ -2028,7 +1824,7 @@ public class PVPHubScreen extends Screen {
             searchHover ? BORDER_COLOR : 0xFF2A2A3A);
         g.fill(barX, barY, barX + searchW, barY + barH,
             searchHover ? 0xFF14202A : 0xFF101019);
-        g.text(font, Component.literal("§7§o>  Click to search players and add a friend"),
+        g.drawString(font, Component.literal("§7§o>  Click to search players and add a friend"),
             barX + 6, barY + 5, TEXT_MUTED, false);
         // kind=4 reuses the "open Add Friend modal" handler.
         friendsHitRects.add(new int[]{barX, barY, barX + searchW, barY + barH, 4, 0});
@@ -2039,7 +1835,7 @@ public class PVPHubScreen extends Screen {
         g.fill(addBtnX - 1, barY - 1, addBtnX + addBtnW + 1, barY + barH + 1,
             addHover ? 0xFF66FF99 : 0xFF00CC44);
         g.fill(addBtnX, barY, addBtnX + addBtnW, barY + barH, 0xFF1A3A1A);
-        g.centeredText(font, Component.literal("§a§l+ ADD FRIEND"),
+        g.drawCenteredString(font, Component.literal("§a§l+ ADD FRIEND"),
             addBtnX + addBtnW / 2, barY + 5, 0xFF66FF99);
         friendsHitRects.add(new int[]{addBtnX, barY, addBtnX + addBtnW, barY + barH, 4, 0});
 
@@ -2051,7 +1847,7 @@ public class PVPHubScreen extends Screen {
         g.fill(refreshBtnX - 1, barY - 1, refreshBtnX + refreshBtnW + 1, barY + barH + 1,
             refreshHover ? BORDER_COLOR : 0xFF2A2A3A);
         g.fill(refreshBtnX, barY, refreshBtnX + refreshBtnW, barY + barH, 0xFF14202A);
-        g.centeredText(font, Component.literal("§b⟳"),
+        g.drawCenteredString(font, Component.literal("§b⟳"),
             refreshBtnX + refreshBtnW / 2, barY + 5, 0xFF66E5FF);
         friendsHitRects.add(new int[]{refreshBtnX, barY, refreshBtnX + refreshBtnW, barY + barH, 6, 0});
 
@@ -2059,7 +1855,7 @@ public class PVPHubScreen extends Screen {
         if (friendsToast != null
             && System.currentTimeMillis() - friendsToastAt < FRIENDS_TOAST_MS) {
             int toastY = y + 16;
-            g.centeredText(font, Component.literal(friendsToast),
+            g.drawCenteredString(font, Component.literal(friendsToast),
                 px + panelW / 2, toastY, friendsToastColor);
         }
 
@@ -2073,7 +1869,7 @@ public class PVPHubScreen extends Screen {
         if (totalPending == 0) {
             g.fill(px + 16 - 1, rowsTop - 1, px + 16 + pendW + 1, rowsTop + 18 + 1, 0xFF2A2A3A);
             g.fill(px + 16, rowsTop, px + 16 + pendW, rowsTop + 18, 0xFF1A1A2A);
-            g.text(font, Component.literal("§8No pending requests"),
+            g.drawString(font, Component.literal("§8No pending requests"),
                 px + 16 + 8, rowsTop + 5, TEXT_MUTED, false);
             pendingExpanded = false;
         } else {
@@ -2086,7 +1882,7 @@ public class PVPHubScreen extends Screen {
                 + (incoming.isEmpty() || outgoing.isEmpty() ? "" : " §8· ")
                 + (outgoing.isEmpty() ? "" : "§b" + outgoing.size() + " sent")
                 + " §7, click to " + (pendingExpanded ? "collapse" : "expand");
-            g.text(font, Component.literal(label), px + 16 + 8, rowsTop + 5, TEXT_PRIMARY, false);
+            g.drawString(font, Component.literal(label), px + 16 + 8, rowsTop + 5, TEXT_PRIMARY, false);
             friendsHitRects.add(new int[]{px + 16, rowsTop, px + 16 + pendW, rowsTop + 18, 5, 0});
         }
 
@@ -2110,7 +1906,7 @@ public class PVPHubScreen extends Screen {
         // ── Friends list ─────────────────────────────────────────────────────
         var list = f.friends();
         if (list.isEmpty()) {
-            g.centeredText(font, Component.literal("§7No friends yet, invite someone with [+ ADD FRIEND]"),
+            g.drawCenteredString(font, Component.literal("§7No friends yet, invite someone with [+ ADD FRIEND]"),
                 px + panelW / 2, listTop + 30, TEXT_MUTED);
             return;
         }
@@ -2125,13 +1921,13 @@ public class PVPHubScreen extends Screen {
         }
     }
 
-    private void renderPendingRequestRow(GuiGraphicsExtractor g, int mx, int my,
+    private void renderPendingRequestRow(GuiGraphics g, int mx, int my,
                                           int x, int y, int w,
                                           FriendsService.FriendRequest req) {
         g.fill(x - 1, y - 1, x + w + 1, y + 19, 0xFF2A2A3A);
         g.fill(x, y, x + w, y + 18, 0xFF101019);
 
-        g.text(font, Component.literal("§f" + req.senderUsername()),
+        g.drawString(font, Component.literal("§f" + req.senderUsername()),
             x + 8, y + 5, TEXT_PRIMARY, false);
 
         // [Accept] [Reject] pills on the right.
@@ -2164,18 +1960,18 @@ public class PVPHubScreen extends Screen {
 
     /** Outgoing request row, read-only, dimmer styling, "Awaiting reply" hint
      *  on the right. No clicks; sender can't cancel from here in v1. */
-    private void renderOutgoingRequestRow(GuiGraphicsExtractor g, int x, int y, int w,
+    private void renderOutgoingRequestRow(GuiGraphics g, int x, int y, int w,
                                             FriendsService.OutgoingRequest req) {
         g.fill(x - 1, y - 1, x + w + 1, y + 19, 0xFF1A2A3A);
         g.fill(x, y, x + w, y + 18, 0xFF0F1620);
-        g.text(font, Component.literal("§b→ §f" + req.targetUsername()),
+        g.drawString(font, Component.literal("§b→ §f" + req.targetUsername()),
             x + 8, y + 5, TEXT_PRIMARY, false);
         String hint = "§8awaiting reply";
-        g.text(font, Component.literal(hint),
+        g.drawString(font, Component.literal(hint),
             x + w - font.width("awaiting reply") - 8, y + 5, TEXT_MUTED, false);
     }
 
-    private void renderFriendRow(GuiGraphicsExtractor g, int mx, int my,
+    private void renderFriendRow(GuiGraphics g, int mx, int my,
                                   int x, int y, int w,
                                   FriendsService.Friend fr, int idx) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + 20;
@@ -2187,13 +1983,11 @@ public class PVPHubScreen extends Screen {
         // subsequent render is a Map lookup. Falls back to a colored fill
         // until the fetch completes.
         int ax = x + 4, ay = y + 4, asz = 12;
-        net.minecraft.resources.Identifier tex = prefetchSkinIfNeeded(fr.uuid(), fr.username());
+        net.minecraft.resources.ResourceLocation tex = prefetchSkinIfNeeded(fr.uuid(), fr.username());
         if (tex != null) {
             try {
-                g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                    tex, ax, ay, 8f, 8f, asz, asz, 8, 8, 64, 64);
-                g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                    tex, ax, ay, 40f, 8f, asz, asz, 8, 8, 64, 64);
+                g.blit(net.minecraft.client.renderer.RenderType::guiTextured, tex, ax, ay, 8f, 8f, asz, asz, 8, 8, 64, 64);
+                g.blit(net.minecraft.client.renderer.RenderType::guiTextured, tex, ax, ay, 40f, 8f, asz, asz, 8, 8, 64, 64);
             } catch (Throwable t) {
                 g.fill(ax, ay, ax + asz, ay + asz, RANK_IRON);
             }
@@ -2201,29 +1995,12 @@ public class PVPHubScreen extends Screen {
             g.fill(ax, ay, ax + asz, ay + asz, RANK_IRON);
         }
 
-        // Username (truncated to 12 chars to keep room for badge + status).
-        String uname = fr.username() == null ? "?" : fr.username();
-        if (uname.length() > 12) uname = uname.substring(0, 11) + "…";
-        g.text(font, Component.literal("§f" + uname),
+        // Username.
+        g.drawString(font, Component.literal("§f" + fr.username()),
             x + 20, y + 6, TEXT_PRIMARY, false);
 
-        // Rank badge + compact division/LP. Slot starts after a fixed
-        // username band (108px) so badges align across rows. Skipped if
-        // friend hasn't placed yet.
-        if (fr.kit() != null && fr.rank() != null) {
-            int badgeX = x + 108;
-            int badgeY = y + 1;
-            net.revivalsmp.pvp.client.render.RankBadgeRenderer.render(
-                g, fr.rank(), badgeX, badgeY, 14);
-            String div = fr.division();
-            String compact = (div == null || div.isBlank() ? "" : div + " ") + fr.lp() + " LP";
-            g.text(font, Component.literal(rankLegacyColor(fr.rank()) + compact),
-                badgeX + 18, y + 6, TEXT_PRIMARY, false);
-        }
-
-        // Presence dot + label, anchored relative to the action buttons so
-        // it stays put regardless of rank text length.
-        int dotX = x + w - 132;
+        // Presence dot + label.
+        int dotX = x + w - 140;
         int dotColor = switch (fr.onlineState() == null ? "" : fr.onlineState()) {
             case "idle"     -> 0xFF44CC44;
             case "in_queue" -> 0xFFCCCC44;
@@ -2237,8 +2014,16 @@ public class PVPHubScreen extends Screen {
             case "in_duel"  -> "duel";
             default         -> "offline";
         };
-        g.text(font, Component.literal("§7" + stateLabel),
+        g.drawString(font, Component.literal("§7" + stateLabel),
             dotX + 8, y + 6, TEXT_MUTED, false);
+
+        // Kit-rank stub if present.
+        if (fr.kit() != null && fr.rank() != null) {
+            String text = rankLegacyColor(fr.rank()) + fr.rank().substring(0, 1) + fr.rank().substring(1).toLowerCase()
+                + (fr.division() == null || fr.division().isBlank() ? "" : " " + fr.division())
+                + " §7" + fr.lp() + "LP";
+            g.drawString(font, Component.literal(text), x + w - 200, y + 6, TEXT_PRIMARY, false);
+        }
 
         // Buttons. Invite ALWAYS rendered, disabled (greyed) when friend
         // isn't idle. The click still registers so the user gets a clear
@@ -2266,19 +2051,19 @@ public class PVPHubScreen extends Screen {
         friendsHitRects.add(new int[]{xX, y + 2, xX + 24, y + 18, 3, idx});
     }
 
-    private void renderSmallPill(GuiGraphicsExtractor g, int mx, int my,
+    private void renderSmallPill(GuiGraphics g, int mx, int my,
                                   int x, int y, int w, String label,
                                   int bg, int border) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + 16;
         g.fill(x - 1, y - 1, x + w + 1, y + 17, hover ? BORDER_COLOR : border);
         g.fill(x, y, x + w, y + 16, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + 4, TEXT_PRIMARY);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + 4, TEXT_PRIMARY);
     }
 
-    private void renderBtn(GuiGraphicsExtractor g, int x, int y, int w, int h, String label, int bg, int border) {
+    private void renderBtn(GuiGraphics g, int x, int y, int w, int h, String label, int bg, int border) {
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, border);
         g.fill(x, y, x + w, y + h, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
     }
 
     // ── Friends data + sponsor data lifecycle ─────────────────────────────────
@@ -2319,7 +2104,7 @@ public class PVPHubScreen extends Screen {
 
     // ── (i) info icon (top-right of title bar) ────────────────────────────────
 
-    private void renderInfoIcon(GuiGraphicsExtractor g, int px, int py, int panelW,
+    private void renderInfoIcon(GuiGraphics g, int px, int py, int panelW,
                                  int mx, int my) {
         // Visible "Account" pill at the right edge of the title row. Sits to
         // the LEFT of the coin pill if one is being rendered; otherwise
@@ -2333,38 +2118,14 @@ public class PVPHubScreen extends Screen {
         int fill   = hover ? 0xFF1A2A3A : 0xFF0E1A24;
         g.fill(x - 1, y - 1, x + pillW + 1, y + pillH + 1, border);
         g.fill(x, y, x + pillW, y + pillH, fill);
-        g.centeredText(font, Component.literal("§b§lⓘ Account"),
+        g.drawCenteredString(font, Component.literal("§b§lⓘ Account"),
             x + pillW / 2, y + 3, BORDER_COLOR);
         infoIconRect = new int[]{x, y, x + pillW, y + pillH};
     }
 
-    /** Unobtrusive "↑ Update vX.Y.Z" pill in the title bar. Only painted when
-     *  {@link net.revivalsmp.pvp.network.UpdateChecker} has confirmed a newer
-     *  version on CurseForge. Click opens the CurseForge mod page. Anchored
-     *  to the left of the (i) "Account" pill so it doesn't shift other UI. */
-    private void renderUpdatePill(GuiGraphicsExtractor g, int mx, int my) {
-        updatePillRect = null;
-        var upd = net.revivalsmp.pvp.network.UpdateChecker.latest();
-        if (upd == null || !upd.updateAvailable() || upd.pageUrl() == null) return;
-        if (infoIconRect == null) return;
-
-        String label = "§e↑ Update v" + upd.latestVersion();
-        int pillW = font.width(label) + 12;
-        int pillH = 14;
-        int x = infoIconRect[0] - pillW - 6;
-        int y = infoIconRect[1];
-        boolean hover = mx >= x && mx < x + pillW && my >= y && my < y + pillH;
-        int border = hover ? 0xFFFFEE66 : 0xFFCCCC44;
-        int fill   = hover ? 0xFF2A2A0A : 0xFF1A1A06;
-        g.fill(x - 1, y - 1, x + pillW + 1, y + pillH + 1, border);
-        g.fill(x, y, x + pillW, y + pillH, fill);
-        g.centeredText(font, Component.literal(label), x + pillW / 2, y + 3, 0xFFFFEE66);
-        updatePillRect = new int[]{x, y, x + pillW, y + pillH};
-    }
-
     // ── Title-bar coin pill (♥ N) ─────────────────────────────────────────────
 
-    private void renderKeyBalancePill(GuiGraphicsExtractor g, int px, int py, int panelW,
+    private void renderKeyBalancePill(GuiGraphics g, int px, int py, int panelW,
                                        int mx, int my) {
         loadCoinBalanceIfNeeded();
 
@@ -2385,7 +2146,7 @@ public class PVPHubScreen extends Screen {
             int border = hover ? 0xFFFF99CC : 0xFFFF6BA8;
             g.fill(x - 1, y - 1, x + pillW + 1, y + pillH + 1, border);
             g.fill(x, y, x + pillW, y + pillH, 0xFF1A1020);
-            g.centeredText(font, Component.literal("§d♥ §f" + coinBalance + " coins"),
+            g.drawCenteredString(font, Component.literal("§d♥ §f" + coinBalance + " coins"),
                 x + pillW / 2, y + 3, 0xFFFF99CC);
             coinPillRect = new int[]{x, y, x + pillW, y + pillH};
         } else {
@@ -2400,13 +2161,13 @@ public class PVPHubScreen extends Screen {
             int w = font.width(text.replaceAll("§.", ""));
             int x = px + panelW - w - 12;
             int y = (coinBalance > 0) ? (py + 22) : (py + 8);
-            g.text(font, Component.literal(text), x, y, RANK_AMBER, false);
+            g.drawString(font, Component.literal(text), x, y, RANK_AMBER, false);
         }
     }
 
     // ── Incoming-invite overlay ──────────────────────────────────────────────
 
-    private void renderInviteOverlay(GuiGraphicsExtractor g, int px, int py, int panelW,
+    private void renderInviteOverlay(GuiGraphics g, int px, int py, int panelW,
                                       int mx, int my) {
         FriendsService f = friendsService();
         if (f == null) { inviteAcceptRect = null; inviteDeclineRect = null; return; }
@@ -2420,9 +2181,9 @@ public class PVPHubScreen extends Screen {
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, BORDER_COLOR);
         g.fill(x, y, x + w, y + h, 0xFF1C1C2C);
 
-        g.text(font, Component.literal("§b§l⚔ Duel Invite"), x + 8, y + 8, BORDER_COLOR, false);
-        g.text(font, Component.literal("§ffrom §f§l" + inv.otherUsername()), x + 8, y + 22, TEXT_PRIMARY, false);
-        g.text(font, Component.literal("§7" + inv.kit() + (inv.ranked() ? " · ranked" : " · unranked")),
+        g.drawString(font, Component.literal("§b§l⚔ Duel Invite"), x + 8, y + 8, BORDER_COLOR, false);
+        g.drawString(font, Component.literal("§ffrom §f§l" + inv.otherUsername()), x + 8, y + 22, TEXT_PRIMARY, false);
+        g.drawString(font, Component.literal("§7" + inv.kit() + (inv.ranked() ? " · ranked" : " · unranked")),
             x + 8, y + 32, TEXT_MUTED, false);
 
         int axB = x + 8, ayB = y + 44;
@@ -2444,7 +2205,7 @@ public class PVPHubScreen extends Screen {
 
     // ── Player detail sub-view (replaces leaderboard list when active) ───────
 
-    private void renderPlayerDetailView(GuiGraphicsExtractor g, int mx, int my,
+    private void renderPlayerDetailView(GuiGraphics g, int mx, int my,
                                          int px, int y, int panelW, int panelH) {
         if (playerDetailEntry == null) return;
         loadPlayerDetailIfNeeded();
@@ -2456,7 +2217,7 @@ public class PVPHubScreen extends Screen {
         boolean backHover = mx >= x && mx < x + 50 && my >= y + 8 && my < y + 24;
         g.fill(x - 1, y + 7, x + 51, y + 25, backHover ? BORDER_COLOR : 0xFF2A2A3A);
         g.fill(x, y + 8, x + 50, y + 24, 0xFF1A1A2A);
-        g.centeredText(font, Component.literal("§7← Back"), x + 25, y + 12, TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal("§7← Back"), x + 25, y + 12, TEXT_MUTED);
         detailBackRect = new int[]{x, y + 8, x + 50, y + 24};
 
         // Header row.
@@ -2475,10 +2236,8 @@ public class PVPHubScreen extends Screen {
             try {
                 // Face: 8x8 region at u=8, v=8 of a 64x64 skin texture, scaled
                 // up to 32x32. Then the hat layer on top at u=40, v=8.
-                g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                    detailSkinTex, x, headY, 8f, 8f, 32, 32, 8, 8, 64, 64);
-                g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                    detailSkinTex, x, headY, 40f, 8f, 32, 32, 8, 8, 64, 64);
+                g.blit(net.minecraft.client.renderer.RenderType::guiTextured, detailSkinTex, x, headY, 8f, 8f, 32, 32, 8, 8, 64, 64);
+                g.blit(net.minecraft.client.renderer.RenderType::guiTextured, detailSkinTex, x, headY, 40f, 8f, 32, 32, 8, 8, 64, 64);
             } catch (Throwable t) {
                 g.fill(x, headY, x + 32, headY + 32, RANK_IRON);
             }
@@ -2492,73 +2251,38 @@ public class PVPHubScreen extends Screen {
         g.fill(x + 32, headY,   x + 33,   headY + 32,  0xFF2A2A3A);
 
         int rankPos     = playerDetailEntry.has("rank_position") ? playerDetailEntry.get("rank_position").getAsInt() : 0;
-        g.text(font, Component.literal("§f§l" + username),
+        g.drawString(font, Component.literal("§f§l" + username),
             x + 40, headY + 4, TEXT_PRIMARY, false);
-        g.text(font, Component.literal("§7Global rank §f#" + rankPos),
+        g.drawString(font, Component.literal("§7Global rank §f#" + rankPos),
             x + 40, headY + 16, TEXT_MUTED, false);
 
-        // Per-kit rank strip: 9 cells, badge + tier label + LP for every
-        // rankable kit the player has touched. Untouched kits show a dim
-        // UNRANKED badge so the strip layout stays stable.
+        // Per-kit rank line, single row pulled from leaderboardEntry (one kit only).
         int kitsY = headY + 40;
-        // Use the live catalog, filtered to rankable kits (drops MIXED).
-        // Order tracks the backend sort_order so the strip layout follows the
-        // same row layout players see in the in-game /pvp chest GUI.
-        java.util.List<Kit> kitRow = Kit.values().stream()
-            .filter(Kit::isRankable)
-            .toList();
-        int stripH = 40;
-        g.fill(x - 1, kitsY - 1, x + innerW + 1, kitsY + stripH + 1, 0xFF2A2A3A);
-        g.fill(x, kitsY, x + innerW, kitsY + stripH, 0xFF101019);
-        int cellW = kitRow.isEmpty() ? innerW : innerW / kitRow.size();
-        for (int i = 0; i < kitRow.size(); i++) {
-            int cellX = x + i * cellW;
-            int badgeX = cellX + (cellW - 14) / 2;
-            int badgeY = kitsY + 3;
-            JsonObject row = detailRatingForKit(kitRow.get(i));
-            boolean placed = row != null && row.has("placement_done")
-                && row.get("placement_done").getAsBoolean();
-            String tier = row != null && row.has("rank") && !row.get("rank").isJsonNull()
-                ? row.get("rank").getAsString() : null;
-            int kitLp  = row != null && row.has("lp") ? row.get("lp").getAsInt() : 0;
-            net.revivalsmp.pvp.client.render.RankBadgeRenderer.render(
-                g, placed && tier != null ? tier : "UNRANKED",
-                badgeX, badgeY, 14);
-            // Kit short code beneath the badge (FIST/SWRD/ARCH/MACE/CRYS/
-            // SPER/TRDT/TNT_/XBOW). Tier color when placed, muted otherwise.
-            String code = kitShortCode(kitRow.get(i));
-            int labelColor = placed && tier != null ? rankColor(tier) : TEXT_MUTED;
-            g.centeredText(font, Component.literal(
-                (placed && tier != null ? rankLegacyColor(tier) : "§8") + code),
-                cellX + cellW / 2, kitsY + 19, labelColor);
-            // LP if placed
-            if (placed && tier != null && kitLp > 0) {
-                g.centeredText(font, Component.literal("§7" + kitLp),
-                    cellX + cellW / 2, kitsY + 29, TEXT_MUTED);
-            } else {
-                g.centeredText(font, Component.literal("§8-"),
-                    cellX + cellW / 2, kitsY + 29, TEXT_MUTED);
-            }
-        }
+        String rank = optStrEntry(playerDetailEntry, "rank", "UNRANKED");
+        String div  = optStrEntry(playerDetailEntry, "division", "");
+        int lp = playerDetailEntry.has("lp") ? playerDetailEntry.get("lp").getAsInt() : 0;
+        g.drawString(font, Component.literal(rankLegacyColor(rank) + rank
+                + (div.isBlank() ? "" : " " + div) + " §7• §e" + lp + " LP"),
+            x, kitsY, rankColor(rank), false);
 
         // Sponsor block, pulled from /sponsor/profile. Sized dynamically to
-        // fill the space between the kit-rank strip and the sponsor buttons.
+        // fill the space between the kit-rank line and the sponsor buttons.
         int btnYReserved  = y + panelH - 28;
-        int sponsorY      = kitsY + stripH + 6;
+        int sponsorY      = kitsY + 16;
         int sponsorH      = (btnYReserved - 12) - sponsorY;
         if (sponsorH < 80) sponsorH = 80;
         g.fill(x - 1, sponsorY - 1, x + innerW + 1, sponsorY + sponsorH + 1, 0xFF2A2A3A);
         g.fill(x, sponsorY, x + innerW, sponsorY + sponsorH, 0xFF101019);
-        g.text(font, Component.literal("§d§l♥ Sponsorship"), x + 8, sponsorY + 6, 0xFFFF6BA8, false);
+        g.drawString(font, Component.literal("§d§l♥ Sponsorship"), x + 8, sponsorY + 6, 0xFFFF6BA8, false);
 
         if (playerDetailLoading) {
-            g.text(font, Component.literal("§7Loading sponsor data..."),
+            g.drawString(font, Component.literal("§7Loading sponsor data..."),
                 x + 8, sponsorY + 22, TEXT_MUTED, false);
             detailSponsorListRect = null;
         } else if (playerDetailProfile != null) {
             int total  = playerDetailProfile.has("total_coins")  ? playerDetailProfile.get("total_coins").getAsInt()  : 0;
             int season = playerDetailProfile.has("season_coins") ? playerDetailProfile.get("season_coins").getAsInt() : 0;
-            g.text(font, Component.literal("§fTotal coins received: §d♥ " + total + " §7(season: " + season + ")"),
+            g.drawString(font, Component.literal("§fTotal coins received: §d♥ " + total + " §7(season: " + season + ")"),
                 x + 8, sponsorY + 22, TEXT_PRIMARY, false);
 
             // Top sponsors list, render as many rows as fit in the remaining
@@ -2579,7 +2303,7 @@ public class PVPHubScreen extends Screen {
             if (detailSponsorScroll < 0) detailSponsorScroll = 0;
 
             if (detailSponsorTotal == 0) {
-                g.text(font, Component.literal("§8No sponsors yet, be the first to back this player."),
+                g.drawString(font, Component.literal("§8No sponsors yet, be the first to back this player."),
                     x + 8, listTop, TEXT_MUTED, false);
             } else {
                 int shown = Math.min(visibleRows, detailSponsorTotal - detailSponsorScroll);
@@ -2588,7 +2312,7 @@ public class PVPHubScreen extends Screen {
                     JsonObject s = ts.get(idx).getAsJsonObject();
                     String name  = optStrEntry(s, "sponsor_name", "?");
                     int coins    = s.has("coins_spent") ? s.get("coins_spent").getAsInt() : 0;
-                    g.text(font, Component.literal("§7" + (idx + 1) + ". §f" + name + " §7, §d♥" + coins),
+                    g.drawString(font, Component.literal("§7" + (idx + 1) + ". §f" + name + " §7, §d♥" + coins),
                         x + 8, listTop + i * rowHeight, TEXT_PRIMARY, false);
                 }
                 // Scrollbar (only if scrollable).
@@ -2646,7 +2370,7 @@ public class PVPHubScreen extends Screen {
                 ? "§c" + lowBalanceMsg + " §7§n(click to buy more)"
                 : "§8Need more coins to sponsor. §7§n(click to buy on the website)";
             int hintW = font.width(msg);
-            g.text(font, Component.literal(msg), x, btnY - 12,
+            g.drawString(font, Component.literal(msg), x, btnY - 12,
                 showShortMsg ? 0xFFFF6BA8 : TEXT_MUTED, false);
             detailBuyCoinsRect = new int[]{ x, btnY - 14, x + hintW, btnY - 2 };
         } else {
@@ -2654,42 +2378,25 @@ public class PVPHubScreen extends Screen {
         }
     }
 
-    private void renderBigBtn(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h,
+    private void renderBigBtn(GuiGraphics g, int mx, int my, int x, int y, int w, int h,
                               String label, int bg, int border) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, hover ? 0xFFFF99CC : border);
         g.fill(x, y, x + w, y + h, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, TEXT_PRIMARY);
     }
 
     private void loadPlayerDetailIfNeeded() {
-        if (playerDetailEntry == null) return;
-        // Sponsor profile fetch.
-        if (!playerDetailLoading && playerDetailProfile == null) {
-            String identifier = optStrEntry(playerDetailEntry, "username", null);
-            if (identifier != null) {
-                playerDetailLoading = true;
-                BackendHttpClient.sponsorProfile(identifier).thenAccept(resp ->
-                    Minecraft.getInstance().execute(() -> {
-                        playerDetailLoading = false;
-                        if (resp != null) playerDetailProfile = resp;
-                    }));
-            }
-        }
-        // Per-kit ratings fetch (independent: we want the kit strip even
-        // for non-sponsors). Uses uuid since the rankings endpoint is keyed
-        // by uuid, not username.
-        if (!detailKitRatingsLoading && detailKitRatings == null) {
-            String uuid = optStrEntry(playerDetailEntry, "uuid", null);
-            if (uuid != null && !uuid.isBlank()) {
-                detailKitRatingsLoading = true;
-                BackendHttpClient.playerRatings(uuid).thenAccept(resp ->
-                    Minecraft.getInstance().execute(() -> {
-                        detailKitRatingsLoading = false;
-                        if (resp != null) detailKitRatings = resp;
-                    }));
-            }
-        }
+        if (playerDetailEntry == null || playerDetailLoading) return;
+        if (playerDetailProfile != null) return;
+        String identifier = optStrEntry(playerDetailEntry, "username", null);
+        if (identifier == null) return;
+        playerDetailLoading = true;
+        BackendHttpClient.sponsorProfile(identifier).thenAccept(resp ->
+            Minecraft.getInstance().execute(() -> {
+                playerDetailLoading = false;
+                if (resp != null) playerDetailProfile = resp;
+            }));
     }
 
     private static String optStrEntry(JsonObject o, String key, String fallback) {
@@ -2712,13 +2419,13 @@ public class PVPHubScreen extends Screen {
     /**
      * Generic skin prefetcher used by both the detail panel and the friends
      * list row avatars. Idempotent and dedup'd via skinFetchInFlight; on
-     * success the resolved Identifier lands in skinTextureCache. Returns
-     * the cached Identifier if there's an immediate hit (so single-frame
+     * success the resolved ResourceLocation lands in skinTextureCache. Returns
+     * the cached ResourceLocation if there's an immediate hit (so single-frame
      * renders can branch without a second map lookup).
      */
-    private net.minecraft.resources.Identifier prefetchSkinIfNeeded(String uuid, String username) {
+    private net.minecraft.resources.ResourceLocation prefetchSkinIfNeeded(String uuid, String username) {
         if (uuid == null) return null;
-        net.minecraft.resources.Identifier cached = skinTextureCache.get(uuid);
+        net.minecraft.resources.ResourceLocation cached = skinTextureCache.get(uuid);
         if (cached != null) return cached;
         if (!skinFetchInFlight.add(uuid)) return null;
 
@@ -2731,22 +2438,26 @@ public class PVPHubScreen extends Screen {
         RevivalPVPMod.LOGGER.info("[skin] fetching profile for {} ({})", username, uuid);
         java.util.concurrent.CompletableFuture
             .supplyAsync(() -> fetchMojangProfile(parsed, username == null ? "" : username, barebones))
-            .thenCompose(populated -> Minecraft.getInstance().getSkinManager().get(populated))
-            .thenAccept(opt -> Minecraft.getInstance().execute(() -> {
+            // 1.21.4 SkinManager API: getOrLoad(GameProfile) returns
+            // CompletableFuture<PlayerSkin> directly (no Optional wrapper).
+            // The 1.21.6+ "get + Optional + .body()" chain doesn't exist here.
+            .thenCompose(populated -> Minecraft.getInstance().getSkinManager().getOrLoad(populated))
+            .thenAccept(skinOpt -> Minecraft.getInstance().execute(() -> {
                 skinFetchInFlight.remove(uuid);
-                if (opt == null || opt.isEmpty()) {
-                    RevivalPVPMod.LOGGER.warn("[skin] SkinManager.get returned empty for {}", uuid);
+                if (skinOpt == null || skinOpt.isEmpty()) {
+                    RevivalPVPMod.LOGGER.warn("[skin] SkinManager.getOrLoad returned empty for {}", uuid);
                     return;
                 }
                 try {
-                    var tex = opt.get().body().texturePath();
+                    // PlayerSkin in 1.21.4 exposes the texture path directly via texture().
+                    var tex = skinOpt.get().texture();
                     skinTextureCache.put(uuid, tex);
                     // Detail panel render-loop convenience: if this fetch was
                     // for the currently-open detail player, surface it now.
                     if (uuid.equals(detailSkinUuid)) detailSkinTex = tex;
                     RevivalPVPMod.LOGGER.info("[skin] resolved {} -> {}", uuid, tex);
                 } catch (Throwable t) {
-                    RevivalPVPMod.LOGGER.warn("[skin] body().texturePath() threw: {}", t.toString());
+                    RevivalPVPMod.LOGGER.warn("[skin] texture() threw: {}", t.toString());
                 }
             }));
         return null;
@@ -2757,7 +2468,7 @@ public class PVPHubScreen extends Screen {
     private void loadDetailSkinIfNeeded(String uuid, String username) {
         if (uuid == null) return;
         detailSkinUuid = uuid;
-        net.minecraft.resources.Identifier hit = prefetchSkinIfNeeded(uuid, username);
+        net.minecraft.resources.ResourceLocation hit = prefetchSkinIfNeeded(uuid, username);
         if (hit != null) detailSkinTex = hit;
     }
 
@@ -2841,12 +2552,12 @@ public class PVPHubScreen extends Screen {
             }
             com.google.gson.JsonObject json = SKIN_GSON.fromJson(resp.body(), com.google.gson.JsonObject.class);
             String resolvedName = json.has("name") ? json.get("name").getAsString() : username;
-            // authlib 7 PropertyMap takes a Multimap in its constructor —
-            // build one then wrap it. PropertyMap.put() still works through
-            // the ForwardingMultimap, but setting via the underlying map is
-            // less reliant on internal state.
-            com.google.common.collect.Multimap<String, com.mojang.authlib.properties.Property> mm =
-                com.google.common.collect.LinkedHashMultimap.create();
+            // 1.21.4 ships an older authlib where PropertyMap is a no-arg
+            // constructor and GameProfile only takes (UUID, String). Properties
+            // are added by calling profile.getProperties().put(key, prop).
+            com.mojang.authlib.GameProfile profile =
+                new com.mojang.authlib.GameProfile(uuid, resolvedName);
+            int propCount = 0;
             if (json.has("properties") && json.get("properties").isJsonArray()) {
                 var arr = json.getAsJsonArray("properties");
                 for (var el : arr) {
@@ -2857,12 +2568,12 @@ public class PVPHubScreen extends Screen {
                     String s = p.has("signature") && !p.get("signature").isJsonNull()
                         ? p.get("signature").getAsString() : null;
                     if (n == null || v == null) continue;
-                    mm.put(n, new com.mojang.authlib.properties.Property(n, v, s));
+                    profile.getProperties().put(n, new com.mojang.authlib.properties.Property(n, v, s));
+                    propCount++;
                 }
             }
-            com.mojang.authlib.properties.PropertyMap pm = new com.mojang.authlib.properties.PropertyMap(mm);
-            RevivalPVPMod.LOGGER.info("[skin] Mojang HTTP got {} properties for {}", pm.size(), uuid);
-            return new com.mojang.authlib.GameProfile(uuid, resolvedName, pm);
+            RevivalPVPMod.LOGGER.info("[skin] Mojang HTTP got {} properties for {}", propCount, uuid);
+            return profile;
         } catch (Throwable t) {
             RevivalPVPMod.LOGGER.warn("[skin] Mojang HTTP failed: {}", t.toString());
             return fallback;
@@ -2870,22 +2581,18 @@ public class PVPHubScreen extends Screen {
     }
 
     private void openPlayerDetail(JsonObject entry) {
-        playerDetailEntry        = entry;
-        playerDetailProfile      = null;
-        playerDetailLoading      = false;
-        detailKitRatings         = null;
-        detailKitRatingsLoading  = false;
+        playerDetailEntry   = entry;
+        playerDetailProfile = null;
+        playerDetailLoading = false;
         // Don't wipe skin state — skinTextureCache is keyed by uuid and will
-        // either return a cached Identifier instantly or kick off a single
+        // either return a cached ResourceLocation instantly or kick off a single
         // dedup'd fetch. Just reset the scroll position for the new view.
         detailSponsorScroll = 0;
     }
 
     private void closePlayerDetail() {
-        playerDetailEntry        = null;
-        playerDetailProfile      = null;
-        detailKitRatings         = null;
-        detailKitRatingsLoading  = false;
+        playerDetailEntry   = null;
+        playerDetailProfile = null;
     }
 
     private static boolean hit(int[] rect, double mx, double my) {
@@ -2920,30 +2627,30 @@ public class PVPHubScreen extends Screen {
             }));
     }
 
-    private void renderToggleBtn(GuiGraphicsExtractor g, int x, int y, String label, boolean active, int mx, int my) {
+    private void renderToggleBtn(GuiGraphics g, int x, int y, String label, boolean active, int mx, int my) {
         int bg = active ? 0xFF1A1A2E : 0xFF0E0E18;
         int border = active ? BORDER_COLOR : 0xFF2A2A3A;
         g.fill(x - 1, y - 1, x + 79, y + 19, border);
         g.fill(x, y, x + 78, y + 18, bg);
-        g.centeredText(font, Component.literal(label), x + 39, y + 5, active ? BORDER_COLOR : TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal(label), x + 39, y + 5, active ? BORDER_COLOR : TEXT_MUTED);
     }
 
     /** Smaller pill button for the scope picker (Local/Region/Global), 48px wide. */
-    private void renderScopeBtn(GuiGraphicsExtractor g, int x, int y, String label, String scopeValue, int mx, int my) {
+    private void renderScopeBtn(GuiGraphics g, int x, int y, String label, String scopeValue, int mx, int my) {
         boolean active = scopeValue.equals(this.scope);
         int bg = active ? 0xFF1A1A2E : 0xFF0E0E18;
         int border = active ? BORDER_COLOR : 0xFF2A2A3A;
         g.fill(x - 1, y - 1, x + 49, y + 19, border);
         g.fill(x, y, x + 48, y + 18, bg);
-        g.centeredText(font, Component.literal(label), x + 24, y + 5, active ? BORDER_COLOR : TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal(label), x + 24, y + 5, active ? BORDER_COLOR : TEXT_MUTED);
     }
 
     // ---------------- Mouse / keyboard ----------------
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mx = event.x();
-        double my = event.y();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        double mx = mouseX;
+        double my = mouseY;
 
         int w = width, h = height;
         int panelW = Math.min(w - 40, 700);
@@ -2954,16 +2661,6 @@ public class PVPHubScreen extends Screen {
         // ── (i) info icon → InfoScreen ───────────────────────────────────────
         if (infoIconRect != null && hit(infoIconRect, mx, my)) {
             Minecraft.getInstance().setScreen(new InfoScreen(this));
-            return true;
-        }
-
-        // ── Update-available pill → open CurseForge page ────────────────────
-        if (updatePillRect != null && hit(updatePillRect, mx, my)) {
-            var upd = net.revivalsmp.pvp.network.UpdateChecker.latest();
-            if (upd != null && upd.pageUrl() != null) {
-                try { net.minecraft.util.Util.getPlatform().openUri(java.net.URI.create(upd.pageUrl())); }
-                catch (Throwable t) { RevivalPVPMod.LOGGER.warn("openUri failed: {}", t.getMessage()); }
-            }
             return true;
         }
 
@@ -3056,7 +2753,7 @@ public class PVPHubScreen extends Screen {
                     return true;
                 }
             }
-            return super.mouseClicked(event, doubleClick);
+            return super.mouseClicked(mouseX, mouseY, button);
         }
 
         // ── Player detail sub-view clicks ────────────────────────────────────
@@ -3079,12 +2776,12 @@ public class PVPHubScreen extends Screen {
             }
             if (detailBuyCoinsRect != null && hit(detailBuyCoinsRect, mx, my)) {
                 // Open the sponsor coin store in the system browser.
-                net.minecraft.util.Util.getPlatform().openUri("https://revivalpvp.net/pvp/store");
+                net.minecraft.Util.getPlatform().openUri("https://revivalpvp.net/pvp/store");
                 lowBalanceMsg        = null;
                 lowBalanceMsgUntilMs = 0;
                 return true;
             }
-            return super.mouseClicked(event, doubleClick);
+            return super.mouseClicked(mouseX, mouseY, button);
         }
 
         // ── Leaderboard scope pills → switch the active scope + refetch ──
@@ -3263,9 +2960,8 @@ public class PVPHubScreen extends Screen {
             if (!inMatchFound && mx >= kitListX + kitListW + 2 - 1 && mx < kitListX + kitListW + 2 + 17 &&
                 my >= kitListY + kitListH / 2 - 8 - 1 && my < kitListY + kitListH / 2 - 8 + 17) {
                 kitScroll += KIT_CARD_W + KIT_CARD_GAP;
-                java.util.List<Kit> kits = Kit.values();
-                int n = kits.size();
-                int totalContentW = n * KIT_CARD_W + Math.max(0, n - 1) * KIT_CARD_GAP;
+                Kit[] kits = Kit.values();
+                int totalContentW = kits.length * KIT_CARD_W + (kits.length - 1) * KIT_CARD_GAP;
                 int maxScroll = Math.max(0, totalContentW - kitListW);
                 if (kitScroll > maxScroll) kitScroll = maxScroll;
                 return true;
@@ -3273,13 +2969,12 @@ public class PVPHubScreen extends Screen {
 
             // Kit card clicks (only if click is inside the list rect)
             if (!inMatchFound && mx >= kitListX && mx < kitListX + kitListW && my >= kitListY && my < kitListY + kitListH) {
-                java.util.List<Kit> kits = Kit.values();
-                for (int i = 0; i < kits.size(); i++) {
+                Kit[] kits = Kit.values();
+                for (int i = 0; i < kits.length; i++) {
                     int cx = kitListX + i * (KIT_CARD_W + KIT_CARD_GAP) - kitScroll;
                     if (mx >= cx && mx < cx + KIT_CARD_W && my >= kitListY && my < kitListY + KIT_CARD_H) {
-                        Kit clicked = kits.get(i);
-                        if (selectedKit == null || !selectedKit.equals(clicked)) loadoutScrollY = 0;
-                        selectedKit = clicked;
+                        if (selectedKit != kits[i]) loadoutScrollY = 0;
+                        selectedKit = kits[i];
                         return true;
                     }
                 }
@@ -3331,7 +3026,7 @@ public class PVPHubScreen extends Screen {
             }
         }
 
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
@@ -3389,9 +3084,8 @@ public class PVPHubScreen extends Screen {
                 double delta = (sy != 0 ? sy : sx);
                 kitScroll -= (int) (delta * (KIT_CARD_W + KIT_CARD_GAP) / 2);
                 if (kitScroll < 0) kitScroll = 0;
-                java.util.List<Kit> kits = Kit.values();
-                int n = kits.size();
-                int totalContentW = n * KIT_CARD_W + Math.max(0, n - 1) * KIT_CARD_GAP;
+                Kit[] kits = Kit.values();
+                int totalContentW = kits.length * KIT_CARD_W + (kits.length - 1) * KIT_CARD_GAP;
                 int maxScroll = Math.max(0, totalContentW - kitListW);
                 if (kitScroll > maxScroll) kitScroll = maxScroll;
                 return true;
@@ -3413,15 +3107,15 @@ public class PVPHubScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
-        if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
             // ESC always closes the panel, the queue keeps running in the
             // background so the player can keep playing on their SMP while
             // waiting. To cancel the queue, click the timer pill.
             onClose();
             return true;
         }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override

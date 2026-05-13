@@ -6,12 +6,16 @@ package net.revivalsmp.pvp.client;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+// 1.21.4 fabric-api uses KeyBindingHelper (renamed to KeyMappingHelper in
+// later versions to track Mojang's KeyMapping/KeyBinding rename). HUD
+// registration is done via HudRenderCallback here — HudElementRegistry
+// was added in fabric-api 0.135+ (post-1.21.5).
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.revivalsmp.pvp.client.hud.PVPHud;
 import net.revivalsmp.pvp.client.screen.MatchResultScreen;
 import net.revivalsmp.pvp.client.screen.PVPHubScreen;
@@ -39,11 +43,11 @@ public class RevivalPVPClient implements ClientModInitializer {
         // Default Y, vanilla 1.21+ doesn't bind Y, so no collision. Users
         // can rebind via Options → Controls → RevivalPVP, or use the
         // pause-menu button added by PauseScreenMixin.
-        openHubKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        openHubKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.revival-pvp.open_hub",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_Y,
-            KeyMapping.Category.MISC
+            "key.categories.misc"
         ));
 
         backendWS  = new BackendWS();
@@ -54,8 +58,10 @@ public class RevivalPVPClient implements ClientModInitializer {
         // Register plugin message channels for duel server communication
         DuelServerListener.register();
 
-        HudElementRegistry.addLast(
-            Identifier.fromNamespaceAndPath("revival-pvp", "hud"),
+        // 1.21.4 HudRenderCallback doesn't take an ID — first-come-first-
+        // served layering. ID-based ordering arrived with HudElementRegistry
+        // post-1.21.5.
+        HudRenderCallback.EVENT.register(
             (guiGraphics, deltaTracker) -> hud.render(guiGraphics, deltaTracker)
         );
 
