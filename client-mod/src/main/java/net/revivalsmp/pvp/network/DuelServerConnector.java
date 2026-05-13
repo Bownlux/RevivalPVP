@@ -61,22 +61,44 @@ public class DuelServerConnector {
 
         RevivalPVPMod.LOGGER.info("Connecting to duel server: {}", address);
 
-        try {
-            ConnectScreen.startConnecting(
-                mc.screen,
-                mc,
-                ServerAddress.parseString(address),
-                serverData,
-                false,
-                null
-            );
-            mc.execute(() -> {
-                String after = mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>";
-                RevivalPVPMod.LOGGER.info("post-startConnecting mc.screen={} (expect ConnectScreen)", after);
-            });
-        } catch (Throwable t) {
-            RevivalPVPMod.LOGGER.error("ConnectScreen.startConnecting threw for {}: {}", address, t.toString(), t);
+        // ConnectScreen.startConnecting calls mc.disconnect() BEFORE
+        // setScreen(ConnectScreen). On 1.21.4, disconnect() synchronously
+        // halts the SP integrated server, which on the render thread
+        // freezes rendering — the user sees black for 5-30s with no
+        // way to leave (we confirmed this empirically with a hang).
+        //
+        // Workaround: show a vanilla "Saving level…" screen FIRST so
+        // the render thread has something to display during the freeze,
+        // then defer startConnecting to the next tick so this screen
+        // actually paints before the disconnect blocks. From SP only —
+        // MP→MP transitions don't have this issue because there's no
+        // local server to halt.
+        if (mc.hasSingleplayerServer()) {
+            RevivalPVPMod.LOGGER.info("In SP — showing Saving level screen before connect");
+            mc.setScreen(new net.minecraft.client.gui.screens.GenericMessageScreen(
+                net.minecraft.network.chat.Component.translatable("menu.savingLevel")));
         }
+
+        // Defer the actual connect so the screen above paints at least
+        // one frame before disconnect blocks. mc.execute queues for the
+        // next render-thread tick.
+        mc.execute(() -> {
+            try {
+                ConnectScreen.startConnecting(
+                    mc.screen,
+                    mc,
+                    ServerAddress.parseString(address),
+                    serverData,
+                    false,
+                    null
+                );
+                RevivalPVPMod.LOGGER.info("startConnecting returned, mc.screen={}",
+                    mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>");
+            } catch (Throwable t) {
+                RevivalPVPMod.LOGGER.error("ConnectScreen.startConnecting threw for {}: {}",
+                    address, t.toString(), t);
+            }
+        });
     }
 
     /**
