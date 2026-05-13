@@ -72,6 +72,7 @@ public class AddFriendModal extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float delta) {
+        this.renderBackground(g, mx, my, delta);
         // Fire any pending suggestion fetch.
         if (pendingFetchAt != 0L && System.currentTimeMillis() >= pendingFetchAt) {
             pendingFetchAt = 0L;

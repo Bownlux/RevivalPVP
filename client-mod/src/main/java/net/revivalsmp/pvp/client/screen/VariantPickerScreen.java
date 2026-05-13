@@ -93,6 +93,7 @@ public class VariantPickerScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float delta) {
+        this.renderBackground(g, mx, my, delta);
         recomputeLayout();
 
         // Dim background (full screen)
