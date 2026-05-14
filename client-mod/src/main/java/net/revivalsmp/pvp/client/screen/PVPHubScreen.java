@@ -263,7 +263,6 @@ public class PVPHubScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float delta) {
-        this.renderBackground(g, mx, my, delta);
         pulseAnim += delta * 0.05f;
 
         int w = width, h = height;

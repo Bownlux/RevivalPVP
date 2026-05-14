@@ -103,7 +103,6 @@ public class InfoScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float delta) {
-        this.renderBackground(g, mx, my, delta);
         hitRects.clear();
 
         // Backdrop dim

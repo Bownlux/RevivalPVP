@@ -29,7 +29,6 @@ public class MatchResultScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float delta) {
-        this.renderBackground(g, mx, my, delta);
         if (result == null) { onClose(); return; }
 
         int cx = width / 2, cy = height / 2;
