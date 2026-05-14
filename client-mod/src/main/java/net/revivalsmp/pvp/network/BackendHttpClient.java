@@ -67,13 +67,6 @@ public final class BackendHttpClient {
         return get(base() + "/duels/live?limit=" + limit);
     }
 
-    /** GET /queue/status, returns {queues: {KIT: int, ...}, total_queued, ...}.
-     *  Used by the hub kit cards to show live "X queued" counts. Public; no
-     *  auth header required. */
-    public static CompletableFuture<JsonObject> queueStatus() {
-        return get(base() + "/queue/status");
-    }
-
     /** POST /duels/{match_id}/spectate, issue a spectator session + relay
      *  address so the caller can transfer the player to the duel server. */
     public static CompletableFuture<JsonObject> spectate(String matchId) {
@@ -84,13 +77,6 @@ public final class BackendHttpClient {
     /** GET /rankings/player/{uuid}, player's per-kit ratings. */
     public static CompletableFuture<JsonObject> playerRatings(String playerUuid) {
         return get(base() + "/rankings/player/" + URLEncoder.encode(playerUuid, StandardCharsets.UTF_8));
-    }
-
-    /** GET /kits/catalog — public kit catalog (metadata + default loadouts) for
-     *  the runtime KitRegistry. No auth needed; KitRegistry caches the result
-     *  to disk so the hub still opens when the backend is unreachable. */
-    public static CompletableFuture<JsonObject> kitCatalog() {
-        return get(base() + "/kits/catalog");
     }
 
     /** GET /kits/loadouts/{kit}, fetches available variants and current selection. */
