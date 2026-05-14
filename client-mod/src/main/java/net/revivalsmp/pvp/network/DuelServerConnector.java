@@ -94,18 +94,25 @@ public class DuelServerConnector {
                     if (sp != null) {
                         sp.halt(false);
                     }
-                    // Wait for the integrated server to actually go away.
-                    // Up to 30s — well past any sane chunk-save time.
+                    // Poll on sp.isStopped() — mc.hasSingleplayerServer() stays
+                    // true even after the server thread exits (the field is
+                    // only nulled out on next world load). Cap at 8s so we
+                    // don't blow past the backend's matchmaking timeout (~20s
+                    // total for match-accept -> player-arrival).
                     int waited = 0;
-                    while (mc.hasSingleplayerServer() && waited < 30000) {
-                        Thread.sleep(100);
-                        waited += 100;
+                    while (sp != null && !sp.isStopped() && waited < 8000) {
+                        Thread.sleep(50);
+                        waited += 50;
                     }
-                    RevivalPVPMod.LOGGER.info("Step B: SP halt observed after {}ms, hasSingleplayerServer={}",
-                        waited, mc.hasSingleplayerServer());
-                    if (mc.hasSingleplayerServer()) {
-                        RevivalPVPMod.LOGGER.error("SP server didn't halt within 30s — aborting connect");
-                        return;
+                    boolean stopped = sp == null || sp.isStopped();
+                    RevivalPVPMod.LOGGER.info("Step B: SP halt observed after {}ms, isStopped={}",
+                        waited, stopped);
+                    if (!stopped) {
+                        // Past 8s with server still running. Attempt the
+                        // connect anyway — startConnecting's internal
+                        // mc.disconnect() should now no-op because halt has
+                        // been signaled, even if not fully complete.
+                        RevivalPVPMod.LOGGER.warn("SP didn't reach isStopped() in 8s — proceeding with connect anyway");
                     }
                     // Back to the render thread for the actual connect.
                     mc.execute(() -> {
