@@ -61,37 +61,89 @@ public class DuelServerConnector {
 
         RevivalPVPMod.LOGGER.info("Connecting to duel server: {}", address);
 
-        // ConnectScreen.startConnecting calls mc.disconnect() BEFORE
-        // setScreen(ConnectScreen). When in SP, disconnect() synchronously
-        // halts the integrated server on the render thread — the screen
-        // freezes (looks black) for 5-30s with no way to leave. Work
-        // around: show a vanilla "Saving level…" screen FIRST so the
-        // render thread has something to display during the freeze, then
-        // defer startConnecting via mc.execute so the screen above paints
-        // at least one frame.
-        if (mc.hasSingleplayerServer()) {
-            RevivalPVPMod.LOGGER.info("In SP — showing Saving level screen before connect");
+        boolean inSp = mc.hasSingleplayerServer();
+
+        if (inSp) {
+            // Show Saving level screen first. ConnectScreen.startConnecting()
+            // calls mc.disconnect() synchronously to halt the SP integrated
+            // server, which blocks the render thread for several seconds —
+            // user sees a black screen unless something is already painted.
             mc.setScreen(new net.minecraft.client.gui.screens.GenericMessageScreen(
                 net.minecraft.network.chat.Component.translatable("menu.savingLevel")));
-        }
 
-        mc.execute(() -> {
+            // mc.execute() from the render thread runs immediately on 1.21.5,
+            // so it doesn't actually defer anything. Use a virtual thread to
+            // sleep briefly off-thread, then mc.execute back onto the render
+            // thread for the actual connect. The sleep gives MC's render loop
+            // a chance to paint a few frames of the saving screen before the
+            // disconnect-induced freeze begins.
+            // v1.0.3 confirmed mc.disconnect() hangs indefinitely on 1.21.5
+            // when called from in-SP (Step A logged, Step B never fired).
+            // Workaround: halt the integrated server explicitly on a
+            // virtual thread (avoids any render-thread deadlock), poll
+            // until it's gone, then queue startConnecting on the render
+            // thread. ConnectScreen.startConnecting's internal disconnect
+            // is then a no-op since there's no SP server to halt.
+            final var sp = mc.getSingleplayerServer();
+            RevivalPVPMod.LOGGER.info("In SP — halting integrated server on virtual thread");
+            Thread.ofVirtual().name("rpvp-sp-halt-connect").start(() -> {
+                try {
+                    // Give the saving-screen paint window a beat.
+                    Thread.sleep(150);
+                    RevivalPVPMod.LOGGER.info("Step A: halting SP server (non-blocking)");
+                    if (sp != null) {
+                        sp.halt(false);
+                    }
+                    // Poll on sp.isStopped() — mc.hasSingleplayerServer() stays
+                    // true even after the server thread exits (the field is
+                    // only nulled out on next world load). Cap at 8s so we
+                    // don't blow past the backend's matchmaking timeout (~20s
+                    // total for match-accept -> player-arrival).
+                    int waited = 0;
+                    while (sp != null && !sp.isStopped() && waited < 8000) {
+                        Thread.sleep(50);
+                        waited += 50;
+                    }
+                    boolean stopped = sp == null || sp.isStopped();
+                    RevivalPVPMod.LOGGER.info("Step B: SP halt observed after {}ms, isStopped={}",
+                        waited, stopped);
+                    if (!stopped) {
+                        // Past 8s with server still running. Attempt the
+                        // connect anyway — startConnecting's internal
+                        // mc.disconnect() should now no-op because halt has
+                        // been signaled, even if not fully complete.
+                        RevivalPVPMod.LOGGER.warn("SP didn't reach isStopped() in 8s — proceeding with connect anyway");
+                    }
+                    // Back to the render thread for the actual connect.
+                    mc.execute(() -> {
+                        try {
+                            RevivalPVPMod.LOGGER.info("Step C: about to startConnecting");
+                            ConnectScreen.startConnecting(
+                                mc.screen, mc, ServerAddress.parseString(address),
+                                serverData, false, null);
+                            RevivalPVPMod.LOGGER.info("Step D: startConnecting returned");
+                        } catch (Throwable t) {
+                            RevivalPVPMod.LOGGER.error("Step D threw: {}", t.toString(), t);
+                        }
+                    });
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Throwable t) {
+                    RevivalPVPMod.LOGGER.error("SP halt flow threw: {}", t.toString(), t);
+                }
+            });
+        } else {
+            // Not in SP — no integrated server shutdown to worry about, just
+            // call startConnecting directly.
             try {
                 ConnectScreen.startConnecting(
-                    mc.screen,
-                    mc,
-                    ServerAddress.parseString(address),
-                    serverData,
-                    false,
-                    null
-                );
-                RevivalPVPMod.LOGGER.info("startConnecting returned, mc.screen={}",
-                    mc.screen != null ? mc.screen.getClass().getSimpleName() : "<null>");
+                    mc.screen, mc, ServerAddress.parseString(address),
+                    serverData, false, null);
             } catch (Throwable t) {
-                RevivalPVPMod.LOGGER.error("ConnectScreen.startConnecting threw for {}: {}",
+                RevivalPVPMod.LOGGER.error("startConnecting threw for {}: {}",
                     address, t.toString(), t);
             }
-        });
+        }
     }
 
     /**
