@@ -77,31 +77,53 @@ public class DuelServerConnector {
             // thread for the actual connect. The sleep gives MC's render loop
             // a chance to paint a few frames of the saving screen before the
             // disconnect-induced freeze begins.
-            RevivalPVPMod.LOGGER.info("In SP — scheduling explicit disconnect + connect after 150ms paint window");
-            Thread.ofVirtual().name("rpvp-deferred-connect").start(() -> {
-                try { Thread.sleep(150); }
-                catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
-                mc.execute(() -> {
-                    try {
-                        // Call mc.disconnect() ourselves FIRST so we can log
-                        // around it. ConnectScreen.startConnecting() would
-                        // do this internally but its hang gives us no info.
-                        RevivalPVPMod.LOGGER.info("Step A: about to call mc.disconnect()");
-                        mc.disconnect();
-                        RevivalPVPMod.LOGGER.info("Step B: mc.disconnect() returned, mc.level={}",
-                            mc.level == null ? "null" : "non-null");
-                        // After disconnect, no SP server. startConnecting
-                        // should now be safe (no SP shutdown to wait on).
-                        RevivalPVPMod.LOGGER.info("Step C: calling ConnectScreen.startConnecting");
-                        ConnectScreen.startConnecting(
-                            mc.screen, mc, ServerAddress.parseString(address),
-                            serverData, false, null);
-                        RevivalPVPMod.LOGGER.info("Step D: startConnecting returned");
-                    } catch (Throwable t) {
-                        RevivalPVPMod.LOGGER.error("SP flow threw at unknown step: {}",
-                            t.toString(), t);
+            // v1.0.3 confirmed mc.disconnect() hangs indefinitely on 1.21.5
+            // when called from in-SP (Step A logged, Step B never fired).
+            // Workaround: halt the integrated server explicitly on a
+            // virtual thread (avoids any render-thread deadlock), poll
+            // until it's gone, then queue startConnecting on the render
+            // thread. ConnectScreen.startConnecting's internal disconnect
+            // is then a no-op since there's no SP server to halt.
+            final var sp = mc.getSingleplayerServer();
+            RevivalPVPMod.LOGGER.info("In SP — halting integrated server on virtual thread");
+            Thread.ofVirtual().name("rpvp-sp-halt-connect").start(() -> {
+                try {
+                    // Give the saving-screen paint window a beat.
+                    Thread.sleep(150);
+                    RevivalPVPMod.LOGGER.info("Step A: halting SP server (non-blocking)");
+                    if (sp != null) {
+                        sp.halt(false);
                     }
-                });
+                    // Wait for the integrated server to actually go away.
+                    // Up to 30s — well past any sane chunk-save time.
+                    int waited = 0;
+                    while (mc.hasSingleplayerServer() && waited < 30000) {
+                        Thread.sleep(100);
+                        waited += 100;
+                    }
+                    RevivalPVPMod.LOGGER.info("Step B: SP halt observed after {}ms, hasSingleplayerServer={}",
+                        waited, mc.hasSingleplayerServer());
+                    if (mc.hasSingleplayerServer()) {
+                        RevivalPVPMod.LOGGER.error("SP server didn't halt within 30s — aborting connect");
+                        return;
+                    }
+                    // Back to the render thread for the actual connect.
+                    mc.execute(() -> {
+                        try {
+                            RevivalPVPMod.LOGGER.info("Step C: about to startConnecting");
+                            ConnectScreen.startConnecting(
+                                mc.screen, mc, ServerAddress.parseString(address),
+                                serverData, false, null);
+                            RevivalPVPMod.LOGGER.info("Step D: startConnecting returned");
+                        } catch (Throwable t) {
+                            RevivalPVPMod.LOGGER.error("Step D threw: {}", t.toString(), t);
+                        }
+                    });
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Throwable t) {
+                    RevivalPVPMod.LOGGER.error("SP halt flow threw: {}", t.toString(), t);
+                }
             });
         } else {
             // Not in SP — no integrated server shutdown to worry about, just
