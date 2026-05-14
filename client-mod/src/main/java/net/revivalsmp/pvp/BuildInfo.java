@@ -34,16 +34,4 @@ public final class BuildInfo {
         Optional<ModContainer> mc = FabricLoader.getInstance().getModContainer(MOD_ID);
         return mc.map(c -> c.getMetadata().getName()).orElse("RevivalPVP");
     }
-
-    /** Friendly release codename ("Dynamic Kit Catalog" etc.), populated from
-     *  the {@code revival-pvp:release_name} custom field in fabric.mod.json,
-     *  which is in turn populated from {@code release_name} in gradle.properties.
-     *  Returns an empty string for nameless releases. */
-    public static String releaseName() {
-        return FabricLoader.getInstance().getModContainer(MOD_ID)
-            .map(c -> c.getMetadata().getCustomValue("revival-pvp:release_name"))
-            .filter(v -> v != null && v.getType() == net.fabricmc.loader.api.metadata.CustomValue.CvType.STRING)
-            .map(v -> v.getAsString())
-            .orElse("");
-    }
 }

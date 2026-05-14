@@ -5,12 +5,10 @@ package net.revivalsmp.pvp.client.screen;
 
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Util;
+import net.minecraft.Util;
 import net.revivalsmp.pvp.BuildInfo;
 import net.revivalsmp.pvp.RevivalPVPMod;
 import net.revivalsmp.pvp.client.RevivalPVPClient;
@@ -68,8 +66,6 @@ public class InfoScreen extends Screen {
     private static final int K_SIGNOUT = 4;
     private static final int K_OPEN    = 5;
     private static final int K_UPDATE  = 6;
-    private static final int K_REFRESH = 7;
-    private static final int K_DISCORD = 8;
 
     private static final String[] LEGAL_LABELS = {"Terms", "Privacy", "Sponsor", "Refunds"};
     private static final String[] LEGAL_PATHS  = {
@@ -88,9 +84,9 @@ public class InfoScreen extends Screen {
     @Override
     protected void init() {
         loadMeIfNeeded();
-        // Trigger an update check the first time the screen opens. Hits the
-        // CurseForge files.rss feed asynchronously; the pill button below renders
-        // on the next frame once the response lands.
+        // Trigger an update check the first time the screen opens. Until
+        // UpdateChecker.ENABLED is true (no Modrinth release exists yet), this
+        // resolves immediately to "no update" without any network request.
         if (UpdateChecker.latest() == null) UpdateChecker.checkOnce();
     }
 
@@ -106,7 +102,7 @@ public class InfoScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         hitRects.clear();
 
         // Backdrop dim
@@ -127,7 +123,7 @@ public class InfoScreen extends Screen {
         // Header: back button (left) + title (center) + open-web-button (right)
         renderTextBtn(g, mx, my, px + 8, py + 8, 44, 14,
             "§7← Back", 0xFF1A1A2A, 0xFF4A4A6A, K_BACK, 0);
-        g.centeredText(font, Component.literal("§b§lAccount"),
+        g.drawCenteredString(font, Component.literal("§b§lAccount"),
             cx, py + 10, PVPTheme.TEXT);
         renderTextBtn(g, mx, my, px + CARD_W - 60, py + 8, 52, 14,
             "§bWebsite ↗", 0xFF1A2A3A, 0xFF66E5FF, K_OPEN, 0);
@@ -136,11 +132,11 @@ public class InfoScreen extends Screen {
 
         // ── Connection block ────────────────────────────────────────────────
         if (meLoading && me == null) {
-            g.text(font, Component.literal("§7Loading..."), px + 12, rowY,
+            g.drawString(font, Component.literal("§7Loading..."), px + 12, rowY,
                 PVPTheme.TEXT_MUTED, false);
             rowY += 24;
         } else if (meError != null) {
-            g.text(font, Component.literal("§c" + meError), px + 12, rowY,
+            g.drawString(font, Component.literal("§c" + meError), px + 12, rowY,
                 0xFFFF6666, false);
             rowY += 24;
         } else if (me != null) {
@@ -149,93 +145,52 @@ public class InfoScreen extends Screen {
             boolean connected = ws != null && ws.isConnected();
             int dot = connected ? 0xFF44CC44 : 0xFFCC4444;
             g.fill(px + 12, rowY + 3, px + 17, rowY + 8, dot);
-            g.text(font, Component.literal(
+            g.drawString(font, Component.literal(
                 connected ? "§aConnected" : "§cOffline"),
                 px + 22, rowY, PVPTheme.TEXT, false);
 
             String username = optStr(me, "username", "?");
-            g.text(font, Component.literal("§f§l" + username),
+            g.drawString(font, Component.literal("§f§l" + username),
                 px + 12, rowY + 12, PVPTheme.TEXT, false);
 
             String mcUuid = optStr(me, "mc_uuid", null);
             if (mcUuid != null && mcUuid.length() >= 8) {
-                g.text(font, Component.literal("§7MC: " + mcUuid.substring(0, 8) + "…"),
+                g.drawString(font, Component.literal("§7MC: " + mcUuid.substring(0, 8) + "…"),
                     px + 12, rowY + 24, PVPTheme.TEXT_MUTED, false);
             }
             String iss = optStr(me, "iss", null);
             if (iss != null) {
-                g.text(font, Component.literal("§8via " + shortIssuer(iss)),
+                g.drawString(font, Component.literal("§8via " + shortIssuer(iss)),
                     px + CARD_W - 12 - font.width("via " + shortIssuer(iss)),
                     rowY + 24, PVPTheme.TEXT_MUTED, false);
             }
             rowY += 38;
 
-            // ── Sponsor coin balance (spendable) + lifetime totals ──────────
-            // Three distinct values surfaced for clarity:
-            //   1) Spendable sponsor-coin balance (what you can give right now).
-            //   2) Lifetime totals — coins purchased, sponsored, received.
-            //   3) Sponsorship USD earnings (cash payable to YOU because
-            //      others have sponsored you).
-            // Each gets its own labeled line so the heart glyph stops
-            // doing double duty for unrelated stats.
-            int coinBal       = optInt(me, "coin_balance", 0);
-            int paidBal       = optInt(me, "paid_balance", 0);
-            int freeBal       = optInt(me, "free_balance", 0);
-            int totalBought   = optInt(me, "total_purchased", 0);
-            int totalSpent    = optInt(me, "total_spent",     0);
-            int totalReceived = optInt(me, "total_received",  0);
-
-            g.text(font, Component.literal(
-                "§d♥ §f" + coinBal + " §7coins to spend"),
+            // ── Coin balance + earnings ───────────────────────────────────
+            int coinBal = optInt(me, "coin_balance", 0);
+            int paidBal = optInt(me, "paid_balance", 0);
+            g.drawString(font, Component.literal("§d♥ §f" + coinBal + " §7coins"),
                 px + 12, rowY, PVPTheme.TEXT, false);
             if (paidBal != coinBal) {
-                g.text(font, Component.literal("§8(" + paidBal + "p · " + freeBal + "f)"),
-                    px + 12 + font.width("♥ " + coinBal + " coins to spend ") + 4, rowY,
+                g.drawString(font, Component.literal("§8(" + paidBal + " paid)"),
+                    px + 12 + font.width("♥ " + coinBal + " coins ") + 6, rowY,
                     PVPTheme.TEXT_MUTED, false);
             }
-            // Click-to-refresh icon at the right edge of the coin row. Forces
-            // a fresh /auth/me fetch, useful right after a Tebex purchase
-            // when the cached `me` payload hasn't picked up the new balance.
-            int refreshX = px + CARD_W - 12 - 14;
-            renderTextBtn(g, mx, my, refreshX, rowY - 2, 14, 14,
-                meLoading ? "§7…" : "§b↻", 0xFF14202A, 0xFF66E5FF, K_REFRESH, 0);
             rowY += 12;
 
-            // Lifetime coin totals. One compact line, hidden when all three
-            // are zero (new accounts) so we don't waste vertical space.
-            // Abbreviated to keep within CARD_W on the smallest GUI scale.
-            if (totalBought > 0 || totalSpent > 0 || totalReceived > 0) {
-                String life = String.format(
-                    "§8Lifetime: §7bought §f%d §8· §7sent §f%d §8· §7got §f%d",
-                    totalBought, totalSpent, totalReceived);
-                g.text(font, Component.literal(life), px + 12, rowY, PVPTheme.TEXT_MUTED, false);
-                rowY += 12;
-            }
-
-            // ── Earnings (received from being sponsored, payable in USD) ───
-            // These dollars are NOT the coin balance above. They're cash you
-            // can withdraw because OTHER players have spent paid coins on
-            // you. "held" is the 60-day rolling window per the sponsor
-            // policy; "available" is what's past the hold and ready to
-            // request via payout. min payout threshold goes on its own
-            // line so the headline numbers fit within CARD_W.
             double avail = optDouble(me, "earnings_available", 0);
             double held  = optDouble(me, "earnings_held",      0);
             double minP  = optDouble(me, "min_payout_usd",     10);
-            String earn = String.format(
-                "§7Payouts: §a$%.2f §7avail §8· §7$%.2f held",
-                avail, held);
-            g.text(font, Component.literal(earn), px + 12, rowY, PVPTheme.TEXT_MUTED, false);
-            rowY += 12;
-            g.text(font, Component.literal(String.format("§8min payout $%.0f", minP)),
-                px + 12, rowY, PVPTheme.TEXT_MUTED, false);
-            rowY += 14;
+            String earn = String.format("§a$%.2f §7available §8· §7$%.2f held §8· §7min $%.0f",
+                avail, held, minP);
+            g.drawString(font, Component.literal(earn), px + 12, rowY, PVPTheme.TEXT_MUTED, false);
+            rowY += 16;
         }
 
         // ── Web Login Code section ──────────────────────────────────────────
         g.fill(px + 8, rowY, px + CARD_W - 8, rowY + 1, 0xFF2A2A3A);
         rowY += 6;
-        g.text(font, Component.literal("§b§lWeb Login"), px + 12, rowY,
+        g.drawString(font, Component.literal("§b§lWeb Login"), px + 12, rowY,
             0xFF66E5FF, false);
         rowY += 12;
 
@@ -245,7 +200,7 @@ public class InfoScreen extends Screen {
             if (secsLeft <= 0) {
                 loginCode = null;
             } else {
-                g.text(font, Component.literal(
+                g.drawString(font, Component.literal(
                     "§7Visit §brevivalpvp.net/login §7and enter:"),
                     px + 12, rowY, PVPTheme.TEXT_MUTED, false);
                 rowY += 12;
@@ -259,7 +214,7 @@ public class InfoScreen extends Screen {
                 int codeBoxMid   = (codeBoxLeft + codeBoxRight) / 2;
                 g.fill(codeBoxLeft - 1, rowY - 1, codeBoxRight + 1, rowY + 19, 0xFFFF6BA8);
                 g.fill(codeBoxLeft, rowY, codeBoxRight, rowY + 18, 0xFF101019);
-                g.centeredText(font, Component.literal("§f§l" + loginCode),
+                g.drawCenteredString(font, Component.literal("§f§l" + loginCode),
                     codeBoxMid, rowY + 5, PVPTheme.TEXT);
 
                 // Copy button, flips to "Copied!" for 1.5s after click.
@@ -274,7 +229,7 @@ public class InfoScreen extends Screen {
                 }
                 rowY += 22;
                 String tt = String.format("§8expires in %d:%02d", secsLeft / 60, secsLeft % 60);
-                g.text(font, Component.literal(tt), px + 12, rowY,
+                g.drawString(font, Component.literal(tt), px + 12, rowY,
                     PVPTheme.TEXT_MUTED, false);
                 rowY += 14;
             }
@@ -285,38 +240,29 @@ public class InfoScreen extends Screen {
                 btnLabel, 0xFF1A3A1A, 0xFF00CC44, K_GEN, 0);
             rowY += 22;
             if (codeError != null) {
-                g.text(font, Component.literal("§c" + codeError),
+                g.drawString(font, Component.literal("§c" + codeError),
                     px + 12, rowY, 0xFFFF6666, false);
                 rowY += 12;
             }
         }
 
-        // ── Legal + Discord links row ───────────────────────────────────────
+        // ── Legal links row ─────────────────────────────────────────────────
         g.fill(px + 8, rowY + 2, px + CARD_W - 8, rowY + 3, 0xFF2A2A3A);
         rowY += 8;
-        // 5 buttons (4 legal + Discord) with 6px gaps between → 4 gaps total.
-        int linkW = (CARD_W - 24 - 24) / 5;
+        int linkW = (CARD_W - 24 - 18) / 4;   // 4 links + 6px gap each
         for (int i = 0; i < LEGAL_LABELS.length; i++) {
             int lx = px + 12 + i * (linkW + 6);
             renderTextBtn(g, mx, my, lx, rowY, linkW, 14,
                 "§b" + LEGAL_LABELS[i], 0xFF14202A, 0xFF66E5FF, K_LEGAL, i);
         }
-        // Discord button — Discord brand purple, sits at the right end of
-        // the legal row. Opens the public vanity invite directly so the URL
-        // is short and game-friendly.
-        int discX = px + 12 + LEGAL_LABELS.length * (linkW + 6);
-        renderTextBtn(g, mx, my, discX, rowY, linkW, 14,
-            "§9§lDiscord", 0xFF1A1A3A, 0xFF7289DA, K_DISCORD, 0);
         rowY += 18;
 
         // ── Version + update banner ─────────────────────────────────────────
         // Always-visible footer: shows the running version and (when an
         // update is detected) a clickable "Update available" pill.
         UpdateChecker.Result upd = UpdateChecker.latest();
-        String releaseName = BuildInfo.releaseName();
-        String verLine = "§8v" + BuildInfo.version()
-            + (releaseName.isEmpty() ? "" : " §7- §f" + releaseName);
-        g.text(font, Component.literal(verLine), px + 12, py + cardH - 22,
+        String verLine = "§8v" + BuildInfo.version();
+        g.drawString(font, Component.literal(verLine), px + 12, py + cardH - 22,
             PVPTheme.TEXT_MUTED, false);
         if (upd != null && upd.updateAvailable() && upd.pageUrl() != null) {
             String label = "§e↑ Update to " + upd.latestVersion();
@@ -330,23 +276,23 @@ public class InfoScreen extends Screen {
         renderTextBtn(g, mx, my, px + CARD_W - 80, py + cardH - 22, 68, 14,
             "§7Sign Out", 0xFF2A1A1A, 0xFF553333, K_SIGNOUT, 0);
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
-    private void renderTextBtn(GuiGraphicsExtractor g, int mx, int my,
+    private void renderTextBtn(GuiGraphics g, int mx, int my,
                                 int x, int y, int w, int h,
                                 String label, int bg, int border,
                                 int kind, int idx) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + h;
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, hover ? 0xFFFFFFFF & border | 0xFF000000 : border);
         g.fill(x, y, x + w, y + h, bg);
-        g.centeredText(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, PVPTheme.TEXT);
+        g.drawCenteredString(font, Component.literal(label), x + w / 2, y + (h - 8) / 2, PVPTheme.TEXT);
         hitRects.add(new int[]{x, y, x + w, y + h, kind, idx});
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean dbl) {
-        double mx = event.x(), my = event.y();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        double mx = mouseX, my = mouseY;
         for (int[] r : hitRects) {
             if (mx >= r[0] && mx < r[2] && my >= r[1] && my < r[3]) {
                 int kind = r[4], idx = r[5];
@@ -361,16 +307,6 @@ public class InfoScreen extends Screen {
                     }
                     case K_GEN     -> requestLoginCode();
                     case K_LEGAL   -> openBrowser("https://revivalpvp.net" + LEGAL_PATHS[idx]);
-                    case K_DISCORD -> openBrowser("https://discord.gg/revival-smp");
-                    case K_REFRESH -> {
-                        // Drop the cached `me` payload and refetch. Drives
-                        // both the coin balance line and the earnings
-                        // summary back to whatever the backend currently
-                        // reports.
-                        me = null;
-                        meError = null;
-                        loadMeIfNeeded();
-                    }
                     case K_UPDATE  -> {
                         UpdateChecker.Result u = UpdateChecker.latest();
                         if (u != null && u.pageUrl() != null) openBrowser(u.pageUrl());
@@ -380,16 +316,16 @@ public class InfoScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(event, dbl);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
-        if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             Minecraft.getInstance().setScreen(parent);
             return true;
         }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private void requestLoginCode() {
