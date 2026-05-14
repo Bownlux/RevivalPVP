@@ -7,10 +7,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.revivalsmp.pvp.kit.VariantItemFactory;
@@ -94,7 +92,7 @@ public class VariantPickerScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         recomputeLayout();
 
         // Dim background (full screen)
@@ -106,8 +104,8 @@ public class VariantPickerScreen extends Screen {
 
         // Header
         String title = "§b§lChoose Variant, §f" + slot;
-        g.text(font, Component.literal(title), panelX + PANEL_PADDING, panelY + 10, TEXT_PRIMARY, false);
-        g.text(font, "§8[Esc] cancel", panelX + panelW - PANEL_PADDING - 70, panelY + 10, TEXT_MUTED, false);
+        g.drawString(font, Component.literal(title), panelX + PANEL_PADDING, panelY + 10, TEXT_PRIMARY, false);
+        g.drawString(font, "§8[Esc] cancel", panelX + panelW - PANEL_PADDING - 70, panelY + 10, TEXT_MUTED, false);
 
         // Grid
         int gridX = panelX + PANEL_PADDING;
@@ -120,10 +118,10 @@ public class VariantPickerScreen extends Screen {
             renderCard(g, i, cx, cy, mx, my);
         }
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
-    private void renderCard(GuiGraphicsExtractor g, int index, int x, int y, int mx, int my) {
+    private void renderCard(GuiGraphics g, int index, int x, int y, int mx, int my) {
         JsonObject v = variants.get(index);
         boolean selected = v.has("id") && v.get("id").getAsInt() == currentVariantId;
         boolean hover = mx >= x && mx < x + CARD_W && my >= y && my < y + CARD_H;
@@ -138,7 +136,7 @@ public class VariantPickerScreen extends Screen {
         int iconX = x + 8;
         int iconY = y + 8;
         if (icon != null && !icon.isEmpty()) {
-            g.item(icon, iconX, iconY);
+            g.renderItem(icon, iconX, iconY);
         } else {
             g.fill(iconX, iconY, iconX + 16, iconY + 16, 0xFF2A2A3A);
         }
@@ -165,7 +163,7 @@ public class VariantPickerScreen extends Screen {
         // font.split for clipping, just render first line.
         var nameLines = font.split(nameC, maxNameW);
         if (!nameLines.isEmpty()) {
-            g.text(font, nameLines.get(0), textX, textY, TEXT_PRIMARY);
+            g.drawString(font, nameLines.get(0), textX, textY, TEXT_PRIMARY);
         }
 
         // Description (wrapped, multi-line, clipped to remaining card height)
@@ -178,13 +176,13 @@ public class VariantPickerScreen extends Screen {
         int drawn = 0;
         for (var line : font.split(Component.literal("§7" + desc), CARD_W - 16)) {
             if (drawn >= maxLines) break;
-            g.text(font, line, x + 8, descY + drawn * lineHeight, TEXT_MUTED);
+            g.drawString(font, line, x + 8, descY + drawn * lineHeight, TEXT_MUTED);
             drawn++;
         }
 
         // Selected badge top-right
         if (selected) {
-            g.text(font, "§b§l✓", x + CARD_W - 14, y + 6, BORDER_COLOR, false);
+            g.drawString(font, "§b§l✓", x + CARD_W - 14, y + 6, BORDER_COLOR, false);
         }
     }
 
@@ -197,9 +195,9 @@ public class VariantPickerScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mx = event.x();
-        double my = event.y();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        double mx = mouseX;
+        double my = mouseY;
 
         // Outside the panel → close (matches "tap-out" UX).
         if (mx < panelX || mx > panelX + panelW || my < panelY || my > panelY + panelH) {
@@ -224,16 +222,16 @@ public class VariantPickerScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
-        if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
             onClose();
             return true;
         }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
