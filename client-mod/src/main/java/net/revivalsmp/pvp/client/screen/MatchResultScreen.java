@@ -3,8 +3,9 @@
 
 package net.revivalsmp.pvp.client.screen;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.revivalsmp.pvp.client.ui.PVPTheme;
@@ -29,7 +30,7 @@ public class MatchResultScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
+    public void render(GuiGraphics g, int mx, int my, float delta) {
         if (result == null) { onClose(); return; }
 
         int cx = width / 2, cy = height / 2;
@@ -45,20 +46,20 @@ public class MatchResultScreen extends Screen {
 
         // Result headline
         String headline = won ? "§a§lVICTORY" : "§c§lDEFEAT";
-        g.centeredText(font, Component.literal(headline), cx, py + 16, accentColor);
+        g.drawCenteredString(font, Component.literal(headline), cx, py + 16, accentColor);
 
         // LP change
         String lpStr = (result.lpChange() >= 0 ? "§a+" : "§c") + result.lpChange() + " LP";
-        g.centeredText(font, Component.literal(lpStr), cx, py + 40, PVPTheme.TEXT);
+        g.drawCenteredString(font, Component.literal(lpStr), cx, py + 40, PVPTheme.TEXT);
 
         // New rank
-        g.centeredText(font, Component.literal("§7" + result.newRank()), cx, py + 56, PVPTheme.TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal("§7" + result.newRank()), cx, py + 56, PVPTheme.TEXT_MUTED);
 
         // Promotion banner
         if (result.promoted()) {
             g.fill(px + 20, py + 74, px + pw - 20, py + 94, 0xFF1A2A1A);
             g.fill(px + 20, py + 74, px + pw - 20, py + 77, PVPTheme.WIN);
-            g.centeredText(font, Component.literal("§a§l★  RANK UP!  ★"), cx, py + 80, PVPTheme.WIN);
+            g.drawCenteredString(font, Component.literal("§a§l★  RANK UP!  ★"), cx, py + 80, PVPTheme.WIN);
         }
 
         // Progress bar (auto-close countdown)
@@ -66,9 +67,9 @@ public class MatchResultScreen extends Screen {
         int barW = pw - 40;
         g.fill(px + 20, py + ph - 14, px + 20 + barW, py + ph - 8, 0xFF1A1A2A);
         g.fill(px + 20, py + ph - 14, px + 20 + (int)(barW * progress), py + ph - 8, accentColor);
-        g.centeredText(font, Component.literal("§7Click anywhere to dismiss"), cx, py + ph - 26, PVPTheme.TEXT_MUTED);
+        g.drawCenteredString(font, Component.literal("§7Click anywhere to dismiss"), cx, py + ph - 26, PVPTheme.TEXT_MUTED);
 
-        super.extractRenderState(g, mx, my, delta);
+        super.render(g, mx, my, delta);
     }
 
     @Override

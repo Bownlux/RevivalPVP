@@ -1,3 +1,7 @@
+// mc/1.21.11 branch. Differences from main (26.1):
+//   - minecraft_version + fabric_version + java_version per gradle.properties
+//   - access_widener_namespace=intermediary because fabric-api 0.141.x's
+//     bundled AWs are still in intermediary namespace
 buildscript {
     repositories {
         maven { url = "https://maven.fabricmc.net/" }
@@ -9,7 +13,7 @@ buildscript {
     }
 }
 
-apply plugin: "net.fabricmc.fabric-loom"
+apply plugin: "fabric-loom"
 apply plugin: "maven-publish"
 
 version = "${project.mod_version}-${project.minecraft_version}"
@@ -24,16 +28,15 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-    include "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    // Source uses mojmap class names (net.minecraft.network.chat.Component
+    // etc.). Use Mojang's official mappings to match the source as-is.
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     // WebSocket client (Tyrus standalone, shaded)
     implementation "org.glassfish.tyrus.bundles:tyrus-standalone-client:2.1.5"
     include "org.glassfish.tyrus.bundles:tyrus-standalone-client:2.1.5"
-
-    // JSON (Gson already in MC classpath, use that)
-    // OpenSkill math done server-side; client just displays results
 }
 
 loom {
@@ -49,12 +52,10 @@ loom {
 
 processResources {
     inputs.property "version", project.version
-    inputs.property "release_name", project.release_name
     filesMatching("fabric.mod.json") {
-        expand "version":      project.version,
-               "mod_mc_dep":   project.mod_mc_dep,
-               "mod_java_dep": project.mod_java_dep,
-               "release_name": project.release_name
+        expand "version": project.version,
+               "mod_mc_dep": project.mod_mc_dep,
+               "mod_java_dep": project.mod_java_dep
     }
 }
 
