@@ -77,19 +77,29 @@ public class DuelServerConnector {
             // thread for the actual connect. The sleep gives MC's render loop
             // a chance to paint a few frames of the saving screen before the
             // disconnect-induced freeze begins.
-            RevivalPVPMod.LOGGER.info("In SP — scheduling startConnecting after 150ms paint window");
+            RevivalPVPMod.LOGGER.info("In SP — scheduling explicit disconnect + connect after 150ms paint window");
             Thread.ofVirtual().name("rpvp-deferred-connect").start(() -> {
                 try { Thread.sleep(150); }
                 catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
                 mc.execute(() -> {
-                    RevivalPVPMod.LOGGER.info("Calling startConnecting from deferred path");
                     try {
+                        // Call mc.disconnect() ourselves FIRST so we can log
+                        // around it. ConnectScreen.startConnecting() would
+                        // do this internally but its hang gives us no info.
+                        RevivalPVPMod.LOGGER.info("Step A: about to call mc.disconnect()");
+                        mc.disconnect();
+                        RevivalPVPMod.LOGGER.info("Step B: mc.disconnect() returned, mc.level={}",
+                            mc.level == null ? "null" : "non-null");
+                        // After disconnect, no SP server. startConnecting
+                        // should now be safe (no SP shutdown to wait on).
+                        RevivalPVPMod.LOGGER.info("Step C: calling ConnectScreen.startConnecting");
                         ConnectScreen.startConnecting(
                             mc.screen, mc, ServerAddress.parseString(address),
                             serverData, false, null);
+                        RevivalPVPMod.LOGGER.info("Step D: startConnecting returned");
                     } catch (Throwable t) {
-                        RevivalPVPMod.LOGGER.error("startConnecting threw for {}: {}",
-                            address, t.toString(), t);
+                        RevivalPVPMod.LOGGER.error("SP flow threw at unknown step: {}",
+                            t.toString(), t);
                     }
                 });
             });
