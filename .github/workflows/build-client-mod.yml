@@ -38,9 +38,15 @@ jobs:
       - name: Build with Gradle
         working-directory: client-mod
         run: ./gradlew build --no-daemon
+      - name: Sanitize ref for artifact name
+        id: ref
+        # actions/upload-artifact rejects names containing / : < > | * ? " \r \n \\
+        # github.ref_name on a branch like mc/1.21.10 still contains a slash,
+        # so replace / with - before using it.
+        run: echo "slug=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
       - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
-          name: revival-pvp-mod-${{ github.ref_name }}
+          name: revival-pvp-mod-${{ steps.ref.outputs.slug }}
           path: client-mod/build/libs/revival-pvp-mod-*.jar
           if-no-files-found: error
